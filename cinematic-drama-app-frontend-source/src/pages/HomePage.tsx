@@ -51,6 +51,11 @@ export default function HomePage() {
   const previewTimerRef = useRef<number | null>(null);
   const activeIndexRef = useRef(0);
   const feedEpisodesRef = useRef<Episode[]>([]);
+  const feedRef = useRef<HTMLElement | null>(null);
+  const swipePointerIdRef = useRef<number | null>(null);
+  const swipeStartYRef = useRef(0);
+  const swipeBlockedRef = useRef(false);
+  const swipeConsumedRef = useRef(false);
   const lastProgressSyncRef = useRef<Record<string, number>>({});
   const soundUnlockedRef = useRef(Capacitor.isNativePlatform());
 
@@ -287,6 +292,37 @@ export default function HomePage() {
     setActiveIndex(nextIndex);
   }, [activateVideo, feedEpisodes.length]);
 
+  const handleFeedPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse') return;
+    swipePointerIdRef.current = event.pointerId;
+    swipeStartYRef.current = event.clientY;
+    swipeBlockedRef.current = Boolean((event.target as HTMLElement).closest('[data-video-control]'));
+    swipeConsumedRef.current = false;
+    if (!swipeBlockedRef.current) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const finishFeedSwipe = (event: React.PointerEvent<HTMLElement>) => {
+    if (swipePointerIdRef.current !== event.pointerId) return;
+    const blocked = swipeBlockedRef.current;
+    const deltaY = event.clientY - swipeStartYRef.current;
+    swipePointerIdRef.current = null;
+    swipeBlockedRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (blocked || Math.abs(deltaY) < 36 || !feedEpisodes.length) return;
+
+    const direction = deltaY < 0 ? 1 : -1;
+    const nextIndex = Math.max(0, Math.min(feedEpisodes.length - 1, activeIndexRef.current + direction));
+    if (nextIndex === activeIndexRef.current) return;
+    swipeConsumedRef.current = true;
+    event.preventDefault();
+    activeIndexRef.current = nextIndex;
+    activateVideo(nextIndex);
+    setActiveIndex(nextIndex);
+    feedRef.current?.scrollTo({ top: nextIndex * (feedRef.current.clientHeight || 0), behavior: 'smooth' });
+  };
+
   useEffect(() => {
     if (!feedEpisodes.length) return;
     activateVideo(activeIndex);
@@ -400,12 +436,27 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth" onScroll={handleFeedScroll}>
+      <section
+        ref={feedRef}
+        className="h-full touch-none snap-y snap-mandatory overflow-y-auto scroll-smooth"
+        onScroll={handleFeedScroll}
+        onPointerDown={handleFeedPointerDown}
+        onPointerUp={finishFeedSwipe}
+        onPointerCancel={(event) => {
+          if (swipePointerIdRef.current !== event.pointerId) return;
+          swipePointerIdRef.current = null;
+          swipeBlockedRef.current = false;
+        }}
+      >
         {feedEpisodes.map((episode, index) => (
           <article
             key={episode.id}
             className="relative h-dvh snap-start snap-always overflow-hidden bg-black"
             onClick={(event) => {
+              if (swipeConsumedRef.current) {
+                swipeConsumedRef.current = false;
+                return;
+              }
               if (interactionActive[index]) return;
               if ((event.target as HTMLElement).closest('[data-video-control]')) return;
               void togglePlaybackAt(index);
@@ -448,7 +499,7 @@ export default function HomePage() {
                 syncWatchProgress(episode, event.currentTarget, { force: true });
               }}
             />
-            <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[90] overflow-hidden" />
+            <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[200] overflow-hidden" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
 
             <button

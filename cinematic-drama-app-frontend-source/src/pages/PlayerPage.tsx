@@ -287,7 +287,7 @@ export default function PlayerPage() {
           if (activeIndexRef.current !== timelineIndex) return;
           const layer = layerRefs.current[timelineIndex];
           if (!layer) return;
-          layer.style.zIndex = '90';
+          layer.style.zIndex = '200';
           renderInteraction(layer, {
             interactionPoint: point,
             assetBaseUrl: timelineManifest.client_hints?.asset_base_url || '/assets/',
@@ -312,7 +312,7 @@ export default function PlayerPage() {
           const layer = layerRefs.current[timelineIndex];
           if (layer) {
             clearInteraction(layer);
-            layer.style.zIndex = '90';
+            layer.style.zIndex = '200';
           }
         },
         onTick: () => undefined,
@@ -330,7 +330,7 @@ export default function PlayerPage() {
       const layer = layerRefs.current[timelineIndex];
       if (layer) {
         clearInteraction(layer);
-        layer.style.zIndex = '90';
+        layer.style.zIndex = '200';
       }
     };
   }, [activeIndex, activateVideo, dramaId, episodes, syncWatchProgress]);
@@ -404,7 +404,7 @@ export default function PlayerPage() {
                 }}
               />
 
-              <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[90] overflow-hidden" />
+              <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[200] overflow-hidden" />
               <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/80 to-transparent" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
 
