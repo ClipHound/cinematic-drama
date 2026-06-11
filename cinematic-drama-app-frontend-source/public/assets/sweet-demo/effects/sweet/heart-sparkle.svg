@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="sparkFill" cx="38%" cy="28%" r="75%">
+      <stop offset="0%" stop-color="#fff7fd"/>
+      <stop offset="25%" stop-color="#ffb8de"/>
+      <stop offset="62%" stop-color="#ff4ca6"/>
+      <stop offset="100%" stop-color="#e50082"/>
+    </radialGradient>
+    <filter id="strongGlow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 1  0 0.25 0 0 0.23  0 0 0.5 0 0.68  0 0 0 0.75 0" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="tinyGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#ff75bd" flood-opacity="0.9"/>
+    </filter>
+  </defs>
+  <g filter="url(#strongGlow)">
+    <path d="M256 430C153 339 95 283 95 197C95 141 135 102 188 102C220 102 244 119 256 145C268 119 292 102 324 102C377 102 417 141 417 197C417 283 359 339 256 430Z" fill="url(#sparkFill)"/>
+    <path d="M256 430C153 339 95 283 95 197C95 141 135 102 188 102C220 102 244 119 256 145C268 119 292 102 324 102C377 102 417 141 417 197C417 283 359 339 256 430Z" fill="none" stroke="#ffd2eb" stroke-width="9" opacity="0.7"/>
+    <ellipse cx="180" cy="163" rx="46" ry="20" fill="#fff" opacity="0.62" transform="rotate(-24 180 163)"/>
+    <ellipse cx="335" cy="156" rx="34" ry="17" fill="#fff" opacity="0.45" transform="rotate(18 335 156)"/>
+  </g>
+  <g fill="#fff" filter="url(#tinyGlow)">
+    <path d="M92 165l10 28 28 10-28 10-10 28-10-28-28-10 28-10z" opacity="0.95"/>
+    <path d="M415 128l9 24 24 9-24 9-9 24-9-24-24-9 24-9z" opacity="0.95"/>
+    <path d="M382 347l8 21 21 8-21 8-8 21-8-21-21-8 21-8z" opacity="0.9"/>
+    <circle cx="145" cy="343" r="5" opacity="0.85"/>
+    <circle cx="368" cy="252" r="4" opacity="0.85"/>
+    <circle cx="238" cy="113" r="4" opacity="0.8"/>
+  </g>
+</svg>

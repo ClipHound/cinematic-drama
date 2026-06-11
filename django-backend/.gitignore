@@ -1,0 +1,6 @@
+db.sqlite3
+media/
+static/
+__pycache__/
+*.py[cod]
+.pytest_cache/

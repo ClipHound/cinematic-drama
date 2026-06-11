@@ -1,0 +1,387 @@
+:root {
+  color: #fff;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+.app-shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(48, 54, 65, 0.28), transparent 31%),
+    #000;
+}
+
+.phone-screen {
+  position: relative;
+  width: min(100vw, calc(100svh * 941 / 1672));
+  height: min(100svh, calc(100vw * 1672 / 941));
+  aspect-ratio: 941 / 1672;
+  container-type: size;
+  overflow: hidden;
+  isolation: isolate;
+  background: #030406;
+  user-select: none;
+}
+
+.scene-bg,
+.scene-bg > * {
+  position: absolute;
+}
+
+.scene-bg {
+  inset: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(76, 12, 11, 0.82) 0%, rgba(21, 12, 20, 0.92) 47%, rgba(4, 20, 50, 0.92) 100%),
+    #05070b;
+}
+
+.scene-bg::before {
+  content: "";
+  position: absolute;
+  inset: 17.4% 0 0;
+  background:
+    radial-gradient(ellipse at 27% 57%, rgba(188, 45, 27, 0.35) 0 9%, transparent 27%),
+    radial-gradient(ellipse at 72% 57%, rgba(32, 94, 164, 0.34) 0 8%, transparent 27%),
+    linear-gradient(90deg, rgba(40, 2, 2, 0.78), rgba(0, 6, 25, 0.78));
+  filter: blur(8px);
+  opacity: 0.94;
+}
+
+.scene-bg::after {
+  content: "";
+  position: absolute;
+  inset: 60% 0 0;
+  background:
+    radial-gradient(circle at 23% 68%, rgba(221, 30, 24, 0.42), transparent 23%),
+    radial-gradient(circle at 83% 71%, rgba(27, 95, 200, 0.38), transparent 25%),
+    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.86));
+}
+
+.scene-noise {
+  inset: 0;
+  opacity: 0.18;
+  mix-blend-mode: screen;
+  background-image:
+    repeating-radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 9px);
+}
+
+.hero {
+  pointer-events: none;
+  object-fit: contain;
+  z-index: 1;
+}
+
+.hero-left {
+  left: -4.8%;
+  top: 8.9%;
+  width: 57.5%;
+  height: auto;
+  filter: saturate(1.05) contrast(1.04) drop-shadow(0 0 24px rgba(135, 22, 18, 0.22));
+  mask-image: linear-gradient(90deg, #000 0 72%, transparent 100%);
+}
+
+.hero-right {
+  right: -5.4%;
+  top: 8.9%;
+  width: 47%;
+  height: auto;
+  filter: saturate(1.08) contrast(1.05) drop-shadow(0 0 28px rgba(30, 93, 180, 0.22));
+  mask-image: linear-gradient(90deg, transparent 0, #000 24% 100%);
+}
+
+.hero-split {
+  inset: 8.9% 32% 45.5%;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(88, 0, 0, 0.5), rgba(15, 12, 42, 0.8), rgba(0, 43, 108, 0.58)),
+    radial-gradient(ellipse at 50% 42%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
+  filter: blur(18px);
+}
+
+.scene-vignette {
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.1) 11%, rgba(0, 0, 0, 0.05) 48%, rgba(0, 0, 0, 0.64) 100%),
+    radial-gradient(ellipse at 50% 40%, transparent 0 46%, rgba(0, 0, 0, 0.46) 79%, rgba(0, 0, 0, 0.92) 100%);
+  pointer-events: none;
+}
+
+.status-bar {
+  position: absolute;
+  z-index: 10;
+  top: 2.05%;
+  left: 6.65%;
+  right: 4.05%;
+  height: 3.2%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.status-time {
+  font-size: clamp(16px, 3.15cqw, 30px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1.17cqw, 11px);
+}
+
+.status-icons > svg {
+  width: clamp(13px, 2.66cqw, 25px);
+  height: clamp(13px, 2.66cqw, 25px);
+}
+
+.signal-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(2px, 0.43cqw, 4px);
+  height: clamp(13px, 2.76cqw, 26px);
+}
+
+.signal-bars i {
+  display: block;
+  width: clamp(3px, 0.64cqw, 6px);
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.signal-bars i:nth-child(1) {
+  height: clamp(4px, 0.85cqw, 8px);
+}
+
+.signal-bars i:nth-child(2) {
+  height: clamp(7px, 1.38cqw, 13px);
+}
+
+.signal-bars i:nth-child(3) {
+  height: clamp(10px, 2.02cqw, 19px);
+}
+
+.signal-bars i:nth-child(4) {
+  height: clamp(13px, 2.66cqw, 25px);
+}
+
+.battery {
+  position: relative;
+  width: clamp(24px, 5cqw, 47px);
+  height: clamp(13px, 2.55cqw, 24px);
+  border: clamp(1.5px, 0.32cqw, 3px) solid currentColor;
+  border-radius: clamp(4px, 0.74cqw, 7px);
+}
+
+.battery::after {
+  content: "";
+  position: absolute;
+  right: clamp(-7px, -0.74cqw, -4px);
+  top: 25%;
+  width: clamp(2px, 0.43cqw, 4px);
+  height: 37%;
+  border-radius: 0 3px 3px 0;
+  background: currentColor;
+}
+
+.battery span {
+  position: absolute;
+  inset: 14% 13% 14% 8%;
+  border-radius: 3px;
+  background: currentColor;
+}
+
+.top-nav {
+  position: absolute;
+  z-index: 10;
+  top: 6%;
+  left: 3.75%;
+  right: 3.65%;
+  height: 4.8%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-icon-button,
+.side-actions button,
+.tab {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-icon-button {
+  width: clamp(30px, 6.48cqw, 61px);
+  height: clamp(30px, 6.48cqw, 61px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #fff;
+}
+
+.app-icon-button svg {
+  width: clamp(25px, 5.42cqw, 51px);
+  height: clamp(25px, 5.42cqw, 51px);
+}
+
+.search-button svg {
+  width: clamp(24px, 5.2cqw, 49px);
+  height: clamp(24px, 5.2cqw, 49px);
+}
+
+.tabs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(34px, 6.6cqw, 62px);
+  padding-top: 5px;
+  color: rgba(255, 255, 255, 0.67);
+}
+
+.tab {
+  position: relative;
+  padding: 0 0 23px;
+  font-size: clamp(19px, 3.38cqw, 32px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.tab-active {
+  color: #fff;
+  font-size: clamp(21px, 3.72cqw, 35px);
+  font-weight: 700;
+}
+
+.tab-active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 33px;
+  height: 4px;
+  border-radius: 999px;
+  background: #fff;
+  transform: translateX(-50%);
+}
+
+.side-actions {
+  position: absolute;
+  z-index: 12;
+  right: 3.1%;
+  top: 31.5%;
+  width: clamp(42px, 7.65cqw, 72px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 3.29cqw, 31px);
+  color: #fff;
+}
+
+.side-actions button {
+  width: clamp(42px, 7.65cqw, 72px);
+  min-height: clamp(42px, 7.65cqw, 72px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  transition: transform 160ms ease, filter 160ms ease, color 160ms ease;
+}
+
+.side-actions button:active {
+  transform: scale(0.96);
+}
+
+.author-action {
+  position: relative;
+  gap: 5px;
+}
+
+.author-ring {
+  width: clamp(36px, 6.59cqw, 62px);
+  height: clamp(36px, 6.59cqw, 62px);
+  display: grid;
+  place-items: center;
+  border: clamp(1.5px, 0.32cqw, 3px) solid rgba(255, 255, 255, 0.93);
+  border-radius: 50%;
+}
+
+.author-action.is-active .author-ring {
+  border-color: rgba(95, 164, 255, 0.95);
+  box-shadow: 0 0 22px rgba(50, 132, 255, 0.42);
+}
+
+.author-avatar {
+  width: clamp(24px, 4.46cqw, 42px);
+  height: clamp(24px, 4.46cqw, 42px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 49% 42%, rgba(255, 255, 255, 0.95) 0 3px, transparent 4px),
+    radial-gradient(circle at 54% 52%, #10121b 0 31%, #e9eef9 32% 43%, #10121b 44% 100%);
+}
+
+.author-plus {
+  position: absolute;
+  top: clamp(28px, 5.1cqw, 48px);
+  right: clamp(2px, 0.43cqw, 4px);
+  width: clamp(19px, 3.4cqw, 32px);
+  height: clamp(19px, 3.4cqw, 32px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fb3d4d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+}
+
+.author-plus svg {
+  width: clamp(12px, 2.13cqw, 20px);
+  height: clamp(12px, 2.13cqw, 20px);
+}
+
+.side-label,
+.side-action span {
+  margin-top: clamp(4px, 0.85cqw, 8px);
+  font-size: clamp(13px, 2.42cqw, 23px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.filled-icon {
+  fill: #fff;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.45));
+}
+
+.side-action > svg {
+  width: clamp(30px, 5.74cqw, 54px);
+  height: clamp(30px, 5.74cqw, 54px);
+}
+
+.like-active .filled-icon {
+  fill: #ff4057;
+  color: #ff4057;
+}
+
+.star-active .filled-icon {
+  fill: #ffd35a;
+  color: #ffd35a;
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.86);
+  outline-offset: 3px;
+}

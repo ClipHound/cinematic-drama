@@ -1,0 +1,1036 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color: #fff;
+  background: #070812;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(118, 67, 255, 0.22), transparent 34%),
+    linear-gradient(145deg, #02030a, #111328 48%, #050611);
+}
+
+.phone-frame {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(135, 70, 255, 0.28), transparent 32%),
+    linear-gradient(160deg, #15182d, #03040b 62%);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+}
+
+.background-image,
+.background-video,
+.fallback-gradient,
+.video-dim {
+  position: absolute;
+  inset: 0;
+}
+
+.background-image {
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.background-video {
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.background-video.is-missing {
+  display: none;
+}
+
+.fallback-gradient {
+  z-index: 0;
+  background:
+    radial-gradient(circle at 68% 18%, rgba(93, 85, 145, 0.52), transparent 30%),
+    radial-gradient(circle at 30% 58%, rgba(91, 31, 168, 0.42), transparent 34%),
+    linear-gradient(180deg, #11131c, #05050c 54%, #08020f);
+}
+
+.video-dim {
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.68), rgba(6, 5, 14, 0.32) 34%, rgba(2, 2, 8, 0.82) 100%),
+    rgba(9, 8, 18, 0.26);
+}
+
+.player-topbar,
+.countdown-copy,
+.predict-zone,
+.bottom-tabs {
+  position: relative;
+  z-index: 3;
+}
+
+.player-topbar {
+  height: 74px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 0;
+}
+
+.icon-button,
+.speed-button,
+.tab-button,
+.pulse-button {
+  border: 0;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.episode-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.speed-button {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.countdown-copy {
+  margin-top: 44px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.66);
+  transition: opacity 520ms ease, transform 520ms ease, filter 520ms ease;
+}
+
+.countdown-copy span {
+  font-size: 14px;
+}
+
+.countdown-copy strong {
+  color: #c9a3ff;
+  font-size: 34px;
+  line-height: 1;
+  text-shadow: 0 0 16px rgba(150, 73, 255, 0.95), 0 0 28px rgba(209, 183, 255, 0.48);
+}
+
+.countdown-copy.is-fading-out {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(-8px) scale(0.96);
+}
+
+.predict-zone {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  padding: 0 24px;
+  transition: opacity 560ms ease, transform 560ms ease, filter 560ms ease;
+}
+
+.predict-zone.is-fading-out {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(16px) scale(0.97);
+}
+
+.predict-card {
+  position: relative;
+  width: 100%;
+  min-height: 500px;
+  padding: 23px 16px 18px;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(circle at 50% 98%, rgba(128, 70, 255, 0.12), transparent 34%) padding-box,
+    radial-gradient(circle at 50% 9%, rgba(210, 190, 255, 0.08), transparent 26%) padding-box,
+    linear-gradient(180deg, rgba(18, 18, 34, 0.58), rgba(8, 8, 20, 0.55) 48%, rgba(16, 12, 35, 0.45) 100%) padding-box,
+    linear-gradient(138deg, rgba(255, 255, 255, 0.34), rgba(170, 110, 255, 0.55) 24%, rgba(94, 65, 170, 0.18) 58%, rgba(176, 129, 255, 0.48) 100%) border-box;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 -1px 18px rgba(164, 108, 255, 0.08) inset,
+    0 26px 62px rgba(0, 0, 0, 0.46),
+    0 0 26px rgba(140, 78, 255, 0.28),
+    0 0 58px rgba(91, 35, 255, 0.13);
+}
+
+.predict-card::before,
+.predict-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.predict-card::before {
+  z-index: 0;
+  left: 14%;
+  right: 14%;
+  top: 0;
+  height: 58px;
+  border-radius: 0 0 999px 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(219, 195, 255, 0.045) 48%, transparent 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.16), transparent 62%);
+  filter: blur(0.2px);
+  opacity: 0.5;
+}
+
+.predict-card::after {
+  z-index: 0;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.7) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 78% 20%, rgba(213, 190, 255, 0.45) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 88% 44%, rgba(255, 255, 255, 0.36) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 22% 64%, rgba(191, 149, 255, 0.48) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 62% 82%, rgba(255, 255, 255, 0.38) 0 1px, transparent 1.4px),
+    radial-gradient(ellipse at 50% 100%, rgba(133, 62, 255, 0.14), transparent 36%),
+    radial-gradient(circle at 50% 44%, rgba(157, 83, 255, 0.06), transparent 30%);
+  opacity: 0.64;
+}
+
+.card-sparkle {
+  position: absolute;
+  left: 50%;
+  top: 214px;
+  z-index: 0;
+  width: 132px;
+  height: 132px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.72), rgba(204, 172, 255, 0.32) 8%, rgba(146, 59, 255, 0.12) 24%, transparent 62%),
+    linear-gradient(90deg, transparent 48%, rgba(236, 215, 255, 0.46) 50%, transparent 52%);
+  filter: blur(0.4px);
+  opacity: 0.5;
+  animation: breathe 2.8s ease-in-out infinite;
+}
+
+.card-kicker,
+.predict-card h1,
+.card-subtitle,
+.choice-row,
+.reward-strip,
+.recorded-tip {
+  position: relative;
+  z-index: 1;
+}
+
+.card-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 0 13px;
+  color: rgba(211, 188, 255, 0.94);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 14px rgba(183, 119, 255, 0.7);
+}
+
+.card-kicker span {
+  font-size: 10px;
+  color: #e5d7ff;
+}
+
+.predict-card h1 {
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 253, 255, 0.96);
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45), 0 0 18px rgba(190, 147, 255, 0.18);
+}
+
+.card-subtitle {
+  margin: 10px 0 19px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: rgba(230, 220, 255, 0.72);
+}
+
+.choice-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 42px 1fr;
+  gap: 8px;
+  align-items: center;
+  perspective: 900px;
+}
+
+.choice-card {
+  position: relative;
+  z-index: 1;
+  height: 174px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(190, 140, 255, 0.45);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.94);
+  background:
+    radial-gradient(circle at 44% 24%, rgba(255, 255, 255, 0.1), transparent 22%),
+    radial-gradient(circle at 50% 82%, rgba(134, 57, 255, 0.08), transparent 42%),
+    linear-gradient(150deg, rgba(26, 24, 43, 0.48), rgba(15, 17, 32, 0.44) 58%, rgba(6, 10, 24, 0.38)),
+    rgba(20, 20, 35, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 14px 28px rgba(0, 0, 0, 0.34),
+    0 0 18px rgba(126, 56, 255, 0.08);
+  transform: rotateY(10deg) translateZ(0);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease, filter 220ms ease;
+}
+
+.choice-card--bright {
+  grid-column: 1;
+}
+
+.choice-card::before,
+.choice-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.choice-card::before {
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 24%),
+    linear-gradient(110deg, transparent 14%, rgba(255, 255, 255, 0.06) 44%, transparent 72%);
+  opacity: 0.34;
+}
+
+.choice-card::after {
+  left: 12%;
+  right: 12%;
+  bottom: -18px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(144, 73, 255, 0.12), transparent 68%);
+  filter: blur(3px);
+}
+
+.choice-card--dark {
+  grid-column: 3;
+  border-color: rgba(198, 182, 238, 0.24);
+  background:
+    radial-gradient(circle at 45% 26%, rgba(255, 255, 255, 0.075), transparent 23%),
+    radial-gradient(circle at 50% 82%, rgba(115, 81, 194, 0.06), transparent 44%),
+    linear-gradient(150deg, rgba(28, 29, 44, 0.44), rgba(16, 19, 35, 0.42) 60%, rgba(7, 10, 24, 0.38)),
+    rgba(20, 20, 35, 0.28);
+  transform: rotateY(-10deg) translateZ(0);
+}
+
+.choice-card:hover,
+.choice-card.is-selected {
+  border-color: rgba(224, 197, 255, 0.9);
+  background:
+    radial-gradient(circle at 42% 23%, rgba(255, 255, 255, 0.17), transparent 24%),
+    radial-gradient(circle at 50% 78%, rgba(174, 90, 255, 0.24), transparent 48%),
+    linear-gradient(150deg, rgba(62, 38, 108, 0.42), rgba(22, 19, 43, 0.48) 58%, rgba(8, 10, 27, 0.42)),
+    rgba(20, 20, 35, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+    0 0 24px rgba(174, 88, 255, 0.56),
+    0 0 48px rgba(111, 49, 255, 0.24),
+    0 19px 38px rgba(0, 0, 0, 0.44);
+  filter: saturate(1.12);
+  transform: rotateY(10deg) translateY(-5px) scale(1.045);
+}
+
+.choice-card--dark:hover,
+.choice-card--dark.is-selected {
+  transform: rotateY(-10deg) translateY(-5px) scale(1.045);
+}
+
+.choice-card strong {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 25px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 14px rgba(198, 157, 255, 0.34);
+}
+
+.choice-card small {
+  position: relative;
+  z-index: 1;
+  max-width: 118px;
+  color: rgba(224, 216, 241, 0.72);
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.choice-orbit {
+  position: relative;
+  z-index: 1;
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(226, 209, 255, 0.48);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.13), rgba(133, 86, 224, 0.08) 48%, transparent 60%),
+    conic-gradient(from 45deg, transparent, rgba(229, 210, 255, 0.28), transparent 34%, rgba(156, 86, 255, 0.28), transparent 68%);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.13),
+    0 0 14px rgba(165, 97, 255, 0.12);
+  transition: border-color 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+}
+
+.choice-orbit::before,
+.choice-orbit::after {
+  content: "";
+  position: absolute;
+  inset: 12px -9px;
+  border: 1px solid rgba(223, 207, 255, 0.28);
+  border-radius: 50%;
+  transform: rotate(-13deg);
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.choice-orbit::after {
+  inset: 18px -13px;
+  opacity: 0.56;
+  transform: rotate(18deg);
+}
+
+.choice-star {
+  color: rgba(247, 240, 255, 0.94);
+  font-size: 34px;
+  filter: drop-shadow(0 0 9px rgba(198, 142, 255, 0.86));
+  transition: color 220ms ease, filter 220ms ease, transform 220ms ease;
+}
+
+.choice-card:hover .choice-orbit,
+.choice-card.is-selected .choice-orbit {
+  border-color: rgba(255, 246, 255, 0.78);
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.18),
+    0 0 23px rgba(185, 111, 255, 0.56);
+}
+
+.choice-card:hover .choice-orbit::before,
+.choice-card:hover .choice-orbit::after,
+.choice-card.is-selected .choice-orbit::before,
+.choice-card.is-selected .choice-orbit::after {
+  filter: drop-shadow(0 0 8px rgba(212, 176, 255, 0.75));
+  opacity: 0.95;
+  animation: orbitSpin 5s linear infinite;
+}
+
+.choice-card:hover .choice-star,
+.choice-card.is-selected .choice-star {
+  color: #fff;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.84)) drop-shadow(0 0 18px rgba(184, 101, 255, 0.86));
+  transform: scale(1.08);
+}
+
+.vs-core {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 12px;
+  width: 50px;
+  height: 154px;
+  display: grid;
+  place-items: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.vs-core::before,
+.vs-core::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.vs-core::before {
+  top: -8px;
+  bottom: -10px;
+  width: 1px;
+  background: linear-gradient(transparent, rgba(192, 129, 255, 0.26) 15%, rgba(255, 244, 255, 0.72) 50%, rgba(152, 79, 255, 0.25) 84%, transparent);
+  box-shadow: 0 0 11px rgba(185, 104, 255, 0.56), 0 0 22px rgba(113, 67, 255, 0.34);
+}
+
+.vs-core::after {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.42), rgba(188, 100, 255, 0.24) 18%, rgba(117, 54, 255, 0.09) 38%, transparent 68%);
+  filter: blur(1px);
+}
+
+.vs-core span {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 31px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 9px rgba(255, 255, 255, 0.76),
+    0 0 18px rgba(192, 111, 255, 0.68),
+    0 0 28px rgba(104, 58, 255, 0.38);
+}
+
+.reward-strip {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 22px auto 0;
+  padding: 10px 15px 10px 12px;
+  border: 1px solid rgba(194, 157, 255, 0.26);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  background:
+    radial-gradient(circle at 18% 50%, rgba(150, 83, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(18, 19, 34, 0.42));
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 10px 24px rgba(0, 0, 0, 0.24),
+    0 0 18px rgba(119, 69, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gift-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 20px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.62), transparent 28%),
+    linear-gradient(135deg, rgba(196, 89, 255, 0.96), rgba(95, 70, 255, 0.92));
+  box-shadow:
+    0 0 18px rgba(169, 82, 255, 0.78),
+    inset 0 0 12px rgba(255, 255, 255, 0.22);
+}
+
+.reward-strip p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.reward-strip strong {
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 650;
+}
+
+.reward-strip span {
+  color: rgba(213, 195, 255, 0.78);
+}
+
+.recorded-tip {
+  margin: 18px auto 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(205, 175, 255, 0.32);
+  border-radius: 999px;
+  color: #eadfff;
+  font-size: 12px;
+  background: rgba(82, 45, 151, 0.42);
+  box-shadow: 0 0 22px rgba(141, 77, 255, 0.35);
+  animation: riseIn 220ms ease both;
+}
+
+.bottom-tabs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 34px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, transparent, rgba(2, 3, 9, 0.76));
+}
+
+.tab-button {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+}
+
+.tab-grid,
+.tab-clock {
+  width: 22px;
+  height: 22px;
+}
+
+.tab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 7px);
+  grid-template-rows: repeat(2, 7px);
+  gap: 4px;
+}
+
+.tab-grid::before,
+.tab-grid::after,
+.tab-clock::before,
+.tab-clock::after {
+  content: "";
+}
+
+.tab-grid::before,
+.tab-grid::after {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 2px;
+  box-shadow: 11px 0 0 -1px transparent, 0 11px 0 -1px transparent;
+}
+
+.tab-clock {
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+}
+
+.tab-clock::before {
+  position: absolute;
+  left: 9px;
+  top: 4px;
+  width: 2px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.tab-clock::after {
+  position: absolute;
+  left: 9px;
+  top: 10px;
+  width: 6px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.pulse-button {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 28px;
+  background: linear-gradient(135deg, #8757ff, #5d32ff);
+  box-shadow: 0 0 24px rgba(123, 78, 255, 0.75);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.54;
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+@keyframes orbitSpin {
+  from {
+    transform: rotate(-13deg);
+  }
+  to {
+    transform: rotate(347deg);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 430px) {
+  .app-shell {
+    padding: 0;
+  }
+
+  .phone-frame {
+    width: 100vw;
+    height: 100vh;
+  }
+}
+
+/* Image-driven prediction card effect */
+.predict-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  margin-top: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.predict-card {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.predict-card::before,
+.predict-card::after,
+.card-sparkle {
+  display: none;
+}
+
+.drama-card-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 18px rgba(116, 99, 255, 0.2));
+  transform: translateZ(0);
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.drama-effect {
+  position: absolute;
+  left: 50%;
+  display: block;
+  max-width: none;
+  mix-blend-mode: screen;
+  filter: brightness(1.08) saturate(1.08);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.drama-effect--card1 {
+  bottom: 108px;
+  width: min(244px, calc((100% - 24px) * 0.6667));
+  transform: translateX(-50%);
+}
+
+.buffer-button-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(88px, 23.5%);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+}
+
+.drama-effect-button {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.drama-effect-button--card2 {
+  display: block;
+}
+
+.drama-effect--card2 {
+  position: relative;
+  left: auto;
+  width: 100%;
+  transform: none;
+}
+
+.energy-ring {
+  position: absolute;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.78;
+  transition: opacity 260ms ease, filter 260ms ease, transform 260ms ease;
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 58% 70%, transparent 74%);
+  mask: radial-gradient(circle, transparent 54%, #000 58% 70%, transparent 74%);
+  mix-blend-mode: screen;
+}
+
+.ring-one {
+  inset: -12px;
+  background:
+    conic-gradient(from 18deg, transparent 0 8%, rgba(116, 95, 255, 0.62) 12%, rgba(229, 207, 255, 0.94) 16%, rgba(142, 96, 255, 0.52) 22%, transparent 31% 46%, rgba(91, 126, 255, 0.5) 51%, rgba(199, 146, 255, 0.82) 57%, transparent 68% 82%, rgba(167, 109, 255, 0.5) 88%, transparent 96% 100%),
+    radial-gradient(circle, transparent 59%, rgba(120, 78, 255, 0.26) 64%, transparent 76%);
+  filter: drop-shadow(0 0 5px rgba(151, 102, 255, 0.62));
+  animation: energySpinClockwise 6.8s linear infinite;
+}
+
+.ring-two {
+  inset: -18px;
+  opacity: 0.56;
+  background:
+    conic-gradient(from 205deg, transparent 0 14%, rgba(178, 126, 255, 0.56) 20%, transparent 29% 42%, rgba(102, 136, 255, 0.44) 47%, rgba(238, 220, 255, 0.78) 51%, transparent 59% 73%, rgba(151, 92, 255, 0.52) 80%, transparent 91% 100%);
+  filter: blur(0.5px) drop-shadow(0 0 8px rgba(95, 82, 255, 0.5));
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 62% 68%, transparent 73%);
+  mask: radial-gradient(circle, transparent 58%, #000 62% 68%, transparent 73%);
+  animation: energySpinCounter 7.4s linear infinite;
+}
+
+.ring-three {
+  inset: -7px;
+  opacity: 0.68;
+  background:
+    conic-gradient(from 310deg, rgba(218, 193, 255, 0.86) 0 4%, transparent 9% 24%, rgba(124, 92, 255, 0.58) 30%, transparent 39% 61%, rgba(202, 149, 255, 0.72) 66%, rgba(245, 236, 255, 0.88) 69%, transparent 75% 100%);
+  filter: drop-shadow(0 0 4px rgba(206, 166, 255, 0.56));
+  -webkit-mask: radial-gradient(circle, transparent 55%, #000 59% 66%, transparent 70%);
+  mask: radial-gradient(circle, transparent 55%, #000 59% 66%, transparent 70%);
+  animation: energySpinClockwise 5.9s linear infinite;
+}
+
+.buffer-button-wrap.holding .energy-ring {
+  opacity: 1;
+  filter: brightness(1.28) saturate(1.22) drop-shadow(0 0 8px rgba(160, 99, 255, 0.78));
+  transform: scale(1.06);
+}
+
+.buffer-button-wrap.holding .ring-one {
+  animation-duration: 1.5s;
+}
+
+.buffer-button-wrap.holding .ring-two {
+  animation-duration: 1.85s;
+}
+
+.buffer-button-wrap.holding .ring-three {
+  animation-duration: 1.25s;
+}
+
+.option-overlay {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+}
+
+.option-hotspot {
+  position: absolute;
+  z-index: 1;
+  border: 0;
+  padding: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: filter 180ms ease;
+}
+
+.option-hotspot::before,
+.option-hotspot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.option-hotspot::before {
+  background:
+    linear-gradient(180deg, rgba(81, 205, 255, 0.26), rgba(14, 119, 255, 0.34)),
+    radial-gradient(circle at 50% 48%, rgba(94, 219, 255, 0.36), rgba(23, 128, 255, 0.16) 58%, transparent 74%);
+  box-shadow:
+    0 0 0 1px rgba(127, 225, 255, 0.78) inset,
+    0 0 18px rgba(81, 202, 255, 0.68),
+    0 0 42px rgba(24, 118, 255, 0.42);
+  mix-blend-mode: screen;
+}
+
+.option-hotspot::after {
+  inset: -1px;
+  border: 1px solid rgba(132, 230, 255, 0.78);
+  box-shadow:
+    0 0 12px rgba(96, 213, 255, 0.72),
+    0 0 28px rgba(24, 126, 255, 0.38);
+}
+
+.option-hotspot--yes {
+  left: 5.3%;
+  top: 57.8%;
+  width: 42.6%;
+  height: 28.1%;
+}
+
+.option-hotspot--no {
+  right: 5.9%;
+  top: 57.8%;
+  width: 42.6%;
+  height: 28.1%;
+}
+
+.option-hotspot:hover,
+.option-hotspot:focus-visible,
+.option-hotspot.is-selected {
+  outline: none;
+  filter: brightness(1.08);
+}
+
+.option-hotspot:hover::before,
+.option-hotspot:hover::after,
+.option-hotspot:focus-visible::before,
+.option-hotspot:focus-visible::after,
+.option-hotspot.is-selected::before,
+.option-hotspot.is-selected::after {
+  opacity: 1;
+}
+
+.recorded-tip--image {
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  z-index: 6;
+  margin: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  animation: imageTipIn 220ms ease both;
+}
+
+@keyframes imageTipIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes cardCountdownTick {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes energySpinClockwise {
+  0% {
+    rotate: 0deg;
+  }
+  100% {
+    rotate: 360deg;
+  }
+}
+
+@keyframes energySpinCounter {
+  0% {
+    rotate: 0deg;
+  }
+  100% {
+    rotate: -360deg;
+  }
+}
+
+/* Compact placement for the countdown + card effect group */
+.countdown-copy {
+  transform: translateY(245px) scale(0.5);
+  transform-origin: top center;
+}
+
+.countdown-copy.is-fading-out {
+  transform: translateY(237px) scale(0.48);
+}
+
+.predict-zone {
+  transform: none;
+  transform-origin: left bottom;
+}
+
+.predict-zone.is-fading-out {
+  transform: translateY(14px) scale(0.98);
+}

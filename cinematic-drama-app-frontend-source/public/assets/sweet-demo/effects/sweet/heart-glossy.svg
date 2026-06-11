@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="body" cx="35%" cy="25%" r="75%">
+      <stop offset="0%" stop-color="#fff2fb"/>
+      <stop offset="22%" stop-color="#ff9bd2"/>
+      <stop offset="55%" stop-color="#ff4fa8"/>
+      <stop offset="100%" stop-color="#d90073"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffbce1"/>
+      <stop offset="45%" stop-color="#ff2d97"/>
+      <stop offset="100%" stop-color="#a8005e"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#c70070" flood-opacity="0.28"/>
+    </filter>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 1  0 0.25 0 0 0.35  0 0 0.5 0 0.75  0 0 0 0.55 0" result="pinkGlow"/>
+      <feMerge><feMergeNode in="pinkGlow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="heartClip">
+      <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#softShadow)">
+    <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z" fill="url(#body)"/>
+    <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z" fill="none" stroke="url(#rim)" stroke-width="20" stroke-linejoin="round" opacity="0.95"/>
+    <path d="M256 432C146 334 86 273 86 184C86 124 126 88 179 88C214 88 241 112 256 143C271 112 298 88 333 88C386 88 426 124 426 184C426 273 366 334 256 432Z" fill="none" stroke="#ffb8df" stroke-width="9" opacity="0.55"/>
+    <g clip-path="url(#heartClip)">
+      <ellipse cx="180" cy="154" rx="72" ry="38" fill="#fff" opacity="0.58" transform="rotate(-25 180 154)"/>
+      <ellipse cx="333" cy="139" rx="48" ry="28" fill="#fff" opacity="0.45" transform="rotate(21 333 139)"/>
+      <path d="M130 282C204 338 290 344 376 276" fill="none" stroke="#ffd9ef" stroke-width="34" stroke-linecap="round" opacity="0.22"/>
+      <ellipse cx="352" cy="236" rx="20" ry="10" fill="#fff" opacity="0.45" transform="rotate(-21 352 236)"/>
+    </g>
+  </g>
+</svg>

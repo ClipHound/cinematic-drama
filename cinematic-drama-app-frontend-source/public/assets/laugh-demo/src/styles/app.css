@@ -1,0 +1,229 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color: #fff;
+  background: #050506;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #050506;
+}
+
+.effect-stage {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #050506;
+}
+
+.stage-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.effect-anchor {
+  position: absolute;
+  top: 50%;
+  right: 1%;
+  z-index: 4;
+  width: clamp(90px, 23vw, 136px);
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+}
+
+.laugh-trigger {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.laugh-trigger:hover,
+.laugh-trigger:focus-visible {
+  outline: none;
+  transform: scale(1.06);
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.36));
+}
+
+.laugh-trigger:active {
+  transform: scale(0.96);
+}
+
+.laugh-trigger img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(0.78);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.inline-lottie {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scale(0.96);
+}
+
+.close-effect {
+  position: absolute;
+  top: 6%;
+  right: 1%;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.25));
+  transition: transform 150ms ease, filter 150ms ease;
+}
+
+.close-effect:hover,
+.close-effect:focus-visible {
+  outline: none;
+  transform: scale(1.12);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.close-effect:active {
+  transform: scale(0.92);
+}
+
+.close-effect img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.tap-hint {
+  position: absolute;
+  left: 50%;
+  top: 84%;
+  z-index: 3;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.36);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.floating-text-layer {
+  position: absolute;
+  top: 50%;
+  right: 1%;
+  z-index: 5;
+  width: clamp(90px, 23vw, 136px);
+  height: clamp(90px, 23vw, 136px);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.floating-text {
+  position: absolute;
+  left: 50%;
+  top: calc(8% + var(--float-y));
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: rgba(125, 64, 12, 0.78);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(255, 246, 219, 0.58);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.08),
+    0 0 12px rgba(255, 227, 142, 0.25);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.36);
+  transform: translateX(-50%);
+  animation: laughTextFloat 1500ms ease-out forwards;
+}
+
+@keyframes laughTextFloat {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-50% + var(--float-x))) translateY(0) scale(0.78);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  78% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(calc(-50% + var(--float-x))) translateY(-92px) scale(1.08);
+  }
+}
+
+@media (min-width: 481px) {
+  .effect-stage {
+    min-height: min(100vh, 900px);
+    aspect-ratio: 9 / 16;
+  }
+}
+
+@media (max-width: 520px) {
+  .effect-stage {
+    max-width: none;
+  }
+
+  .effect-anchor {
+    right: 0;
+    width: 108px;
+  }
+
+  .floating-text-layer {
+    right: 0;
+    width: 108px;
+    height: 108px;
+  }
+
+  .floating-text {
+    font-size: 13px;
+  }
+}

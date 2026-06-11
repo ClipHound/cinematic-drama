@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bubbleFill" cx="42%" cy="26%" r="80%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="38%" stop-color="#ffd6ea" stop-opacity="0.36"/>
+      <stop offset="70%" stop-color="#ff88bf" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#ff4aa2" stop-opacity="0.42"/>
+    </radialGradient>
+    <linearGradient id="bubbleRim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff5fb" stop-opacity="0.88"/>
+      <stop offset="35%" stop-color="#ffc7e2" stop-opacity="0.80"/>
+      <stop offset="75%" stop-color="#ff5daa" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#ff2d90" stop-opacity="0.78"/>
+    </linearGradient>
+    <filter id="bubbleGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#ff82bd" flood-opacity="0.35"/>
+    </filter>
+    <clipPath id="heartClip">
+      <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#bubbleGlow)">
+    <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z" fill="url(#bubbleFill)"/>
+    <path d="M256 452C132 342 64 277 64 180C64 111 112 64 176 64C213 64 240 84 256 112C272 84 299 64 336 64C400 64 448 111 448 180C448 277 380 342 256 452Z" fill="none" stroke="url(#bubbleRim)" stroke-width="18" stroke-linejoin="round"/>
+    <path d="M256 430C151 337 91 277 91 187C91 132 128 94 179 94C213 94 239 116 256 150C273 116 299 94 333 94C384 94 421 132 421 187C421 277 361 337 256 430Z" fill="none" stroke="#fff" stroke-width="8" opacity="0.40"/>
+    <g clip-path="url(#heartClip)">
+      <ellipse cx="169" cy="151" rx="67" ry="32" fill="#fff" opacity="0.62" transform="rotate(-24 169 151)"/>
+      <ellipse cx="341" cy="146" rx="50" ry="24" fill="#fff" opacity="0.48" transform="rotate(18 341 146)"/>
+      <path d="M95 255C156 322 274 372 411 248" fill="none" stroke="#fff" stroke-width="26" stroke-linecap="round" opacity="0.20"/>
+      <circle cx="356" cy="246" r="9" fill="#fff" opacity="0.58"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "drama-understanding-agent"
+version = "0.1.0"
+description = "Project-isolated drama understanding agent with structured memory."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ClipHound" }]
+keywords = ["video-understanding", "multi-agent", "llm", "qdrant", "short-drama"]
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "qdrant-client>=1.9",
+    "json-repair>=0.30",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+drama-agent = "drama_agent.cli:app"
+drama-api = "drama_agent.api.server:main"
+
+[project.urls]
+Homepage = "https://github.com/ClipHound/cinematic-drama"
+Repository = "https://github.com/ClipHound/cinematic-drama"
+Issues = "https://github.com/ClipHound/cinematic-drama/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/drama_agent", "src/interaction_designer", "src/interaction_generator", "src/branch_narrative"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

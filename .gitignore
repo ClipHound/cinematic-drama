@@ -1,0 +1,73 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+# .env.production should stay ignored. Use .env.production.example as the template.
+.env.production
+!.env.production.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+service-account.json
+*.cred
+secret*
+!SECURITY.md
+!secret-scan.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+build/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Django / databases / uploaded media
+django-backend/db.sqlite3
+django-backend/media/
+django-backend/staticfiles/
+*.sqlite
+*.sqlite3
+*.db
+
+# Runtime logs and temporary files
+*.log
+tmp-*.out.log
+tmp-*.err.log
+runtime/
+*.tmp
+*.temp
+
+# Offline pipeline large/generated artifacts
+drama-understanding-agent/content/videos/
+drama-understanding-agent/projects/
+drama-understanding-agent/outputs/
+drama-understanding-agent/runtime/
+drama-understanding-agent/frames_ep*/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
