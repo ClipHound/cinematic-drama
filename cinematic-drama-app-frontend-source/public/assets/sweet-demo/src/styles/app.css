@@ -912,22 +912,22 @@ button {
   }
 
   10% {
-    opacity: calc(var(--opacity) * var(--heart-stage-opacity));
+    opacity: var(--opacity);
   }
 
   50% {
-    opacity: calc(var(--opacity) * var(--heart-stage-opacity) * 0.72);
-    transform: translate3d(calc(var(--drift) * 0.45), calc(var(--rise) * -0.52), 0) scale(1) rotate(calc(var(--rotate) * 0.45));
+    opacity: var(--mid-opacity);
+    transform: translate3d(var(--mid-drift), var(--mid-rise), 0) scale(1) rotate(var(--mid-rotate));
   }
 
   80% {
-    opacity: calc(var(--opacity) * var(--heart-stage-opacity) * 0.38);
-    transform: translate3d(calc(var(--drift) * 0.78), calc(var(--rise) * -0.84), 0) scale(1.06) rotate(calc(var(--rotate) * 0.78));
+    opacity: var(--late-opacity);
+    transform: translate3d(var(--late-drift), var(--late-rise), 0) scale(1.06) rotate(var(--late-rotate));
   }
 
   100% {
     opacity: 0;
-    transform: translate3d(var(--drift), calc(var(--rise) * -1), 0) scale(1.1) rotate(var(--rotate));
+    transform: translate3d(var(--drift), var(--end-rise), 0) scale(1.1) rotate(var(--rotate));
   }
 }
 

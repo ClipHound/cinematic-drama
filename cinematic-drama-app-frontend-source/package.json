@@ -35,8 +35,10 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.2",
     "@vitejs/plugin-react": "^6.0.1",
     "lucide-react": "^0.560.0",
     "react": "^19.2.6",

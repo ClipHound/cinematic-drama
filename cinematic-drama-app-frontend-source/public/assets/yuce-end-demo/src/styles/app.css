@@ -873,7 +873,8 @@ button {
   position: absolute;
   z-index: 5;
   inset: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .option-hotspot {
@@ -885,6 +886,8 @@ button {
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 

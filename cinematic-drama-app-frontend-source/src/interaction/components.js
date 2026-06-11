@@ -40,9 +40,17 @@ function emit(props, actionData = {}, eventType) {
   });
 }
 
+function isolateInteractionEvents(node) {
+  node.dataset.videoControl = 'interaction';
+  ['pointerdown', 'pointerup', 'click'].forEach((eventName) => {
+    node.addEventListener(eventName, (event) => event.stopPropagation());
+  });
+}
+
 function createStage(container, props, manager, className, title, subtitle) {
   const node = document.createElement('section');
   node.className = `real-effect ${className}`;
+  isolateInteractionEvents(node);
   node.innerHTML = `
     <button class="real-close" type="button" aria-label="关闭互动">
       <span>×</span>
@@ -63,6 +71,7 @@ function createStage(container, props, manager, className, title, subtitle) {
 function createOriginalStage(container, cssPath, extraCssPaths = []) {
   const host = document.createElement('section');
   host.className = 'original-effect-host';
+  isolateInteractionEvents(host);
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <link rel="stylesheet" href="${cssPath}">
@@ -691,20 +700,36 @@ function SugarStorm(container, props) {
     if (level >= 20) return 0.35;
     return 0.2;
   };
-  const createHeartParticle = (level) => ({
-    id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-    src: HEART_ASSETS[Math.floor(Math.random() * HEART_ASSETS.length)],
-    left: randomBetween(5, 95),
-    bottom: randomBetween(8, 38),
-    size: Math.round(randomBetween(12, 36)),
-    drift: Math.round(randomBetween(-35, 35)),
-    rise: Math.round(randomBetween(260, 420)),
-    opacity: randomBetween(0.45, 0.95),
-    duration: randomBetween(3.5, 5.5),
-    delay: randomBetween(0, 0.4),
-    rotate: Math.round(randomBetween(-25, 25)),
-    glow: Math.random() < getGlowChance(level),
-  });
+  const createHeartParticle = (level) => {
+    const drift = Math.round(randomBetween(-35, 35));
+    const rise = Math.round(randomBetween(260, 420));
+    const rotate = Math.round(randomBetween(-25, 25));
+    const opacity = randomBetween(0.45, 0.95);
+    const stageOpacity = level >= 80 ? 1 : level >= 50 ? 0.86 : 0.72;
+    return {
+      id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      src: HEART_ASSETS[Math.floor(Math.random() * HEART_ASSETS.length)],
+      left: randomBetween(5, 95),
+      bottom: randomBetween(8, 38),
+      size: Math.round(randomBetween(12, 36)),
+      drift,
+      rise,
+      opacity: Number((opacity * stageOpacity).toFixed(3)),
+      midOpacity: Number((opacity * stageOpacity * 0.72).toFixed(3)),
+      lateOpacity: Number((opacity * stageOpacity * 0.38).toFixed(3)),
+      midDrift: Math.round(drift * 0.45),
+      lateDrift: Math.round(drift * 0.78),
+      midRise: Math.round(rise * -0.52),
+      lateRise: Math.round(rise * -0.84),
+      endRise: -rise,
+      midRotate: Number((rotate * 0.45).toFixed(2)),
+      lateRotate: Number((rotate * 0.78).toFixed(2)),
+      rotate,
+      duration: randomBetween(3.5, 5.5),
+      delay: randomBetween(0, 0.4),
+      glow: Math.random() < getGlowChance(level),
+    };
+  };
   const clearDecay = () => {
     window.clearTimeout(decayTimer);
     window.clearInterval(decayInterval);
@@ -737,6 +762,15 @@ function SugarStorm(container, props) {
         --duration:${particle.duration}s;
         --delay:${particle.delay}s;
         --opacity:${particle.opacity};
+        --mid-opacity:${particle.midOpacity};
+        --late-opacity:${particle.lateOpacity};
+        --mid-drift:${particle.midDrift}px;
+        --late-drift:${particle.lateDrift}px;
+        --mid-rise:${particle.midRise}px;
+        --late-rise:${particle.lateRise}px;
+        --end-rise:${particle.endRise}px;
+        --mid-rotate:${particle.midRotate}deg;
+        --late-rotate:${particle.lateRotate}deg;
       "
     />
   `).join('');
@@ -759,6 +793,15 @@ function SugarStorm(container, props) {
       item.style.setProperty('--duration', `${particle.duration}s`);
       item.style.setProperty('--delay', `${particle.delay}s`);
       item.style.setProperty('--opacity', particle.opacity);
+      item.style.setProperty('--mid-opacity', particle.midOpacity);
+      item.style.setProperty('--late-opacity', particle.lateOpacity);
+      item.style.setProperty('--mid-drift', `${particle.midDrift}px`);
+      item.style.setProperty('--late-drift', `${particle.lateDrift}px`);
+      item.style.setProperty('--mid-rise', `${particle.midRise}px`);
+      item.style.setProperty('--late-rise', `${particle.lateRise}px`);
+      item.style.setProperty('--end-rise', `${particle.endRise}px`);
+      item.style.setProperty('--mid-rotate', `${particle.midRotate}deg`);
+      item.style.setProperty('--late-rotate', `${particle.lateRotate}deg`);
       layer.appendChild(item);
     });
   };
@@ -796,6 +839,26 @@ function SugarStorm(container, props) {
     }
 
     stage.innerHTML = `
+      <style>
+        .phone-frame-sweet .sweet-interaction {
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 112px !important;
+          width: 100% !important;
+          padding: 0 12px !important;
+          transform: none !important;
+        }
+        .phone-frame-sweet .sweet-button {
+          width: 100% !important;
+          max-width: none !important;
+        }
+        .phone-frame-sweet .sweet-level-indicator {
+          bottom: 178px !important;
+        }
+        .phone-frame-sweet .sweet-pink-filter {
+          display: none !important;
+        }
+      </style>
       <section class="phone-frame phone-frame-sweet">
         <div class="sweet-pink-filter ${sweetStage}" style="--sweet-ratio:${sweetLevel / 100}"></div>
         <div class="heart-particles ${sweetStage}" aria-hidden="true">${renderParticles()}</div>
@@ -1174,23 +1237,13 @@ function TeamCheer(container, props, manager) {
       : 'M0 49 C8 54 22 38 32 46 C43 54 54 47 64 39 C75 30 86 58 96 47 C107 35 118 13 128 45 C139 73 149 51 160 42 C171 33 181 58 192 49 C203 40 214 62 224 46 C235 29 245 17 256 49 C267 70 278 53 288 48 C299 44 309 51 320 48';
     const base = side === 'left' ? redMain : blueMain;
     const fill = `${base} L320 80 L0 80 Z`;
-    const fillAlt = `${alt} L320 80 L0 80 Z`;
-    const duration = side === 'left' ? '38s' : '44s';
     return `
       <div class="fco-waveform" aria-hidden="true">
         <svg viewBox="0 0 320 80" preserveAspectRatio="none" focusable="false">
-          <path class="fco-wave-glow" d="${base}">
-            <animate attributeName="d" dur="${duration}" repeatCount="indefinite" values="${base}; ${alt}; ${base}" />
-          </path>
-          <path class="fco-wave-main" d="${base}">
-            <animate attributeName="d" dur="${duration}" repeatCount="indefinite" values="${base}; ${alt}; ${base}" />
-          </path>
-          <path class="fco-wave-secondary" d="${alt}">
-            <animate attributeName="d" dur="${side === 'left' ? '52s' : '58s'}" repeatCount="indefinite" values="${alt}; ${base}; ${alt}" />
-          </path>
-          <path class="fco-wave-fill" d="${fill}">
-            <animate attributeName="d" dur="${duration}" repeatCount="indefinite" values="${fill}; ${fillAlt}; ${fill}" />
-          </path>
+          <path class="fco-wave-glow" d="${base}"></path>
+          <path class="fco-wave-main" d="${base}"></path>
+          <path class="fco-wave-secondary" d="${alt}"></path>
+          <path class="fco-wave-fill" d="${fill}"></path>
           <g class="fco-wave-sparks">
             <circle cx="84" cy="46" r="1.8" />
             <circle cx="108" cy="46" r="2.2" />
@@ -1256,7 +1309,7 @@ function TeamCheer(container, props, manager) {
     } else {
       right.score += 1;
     }
-    renderTeam();
+    updateTeamDom();
     emit(props, {
       chosen_team: id,
       cheer_count: cheerCount,
@@ -1282,6 +1335,33 @@ function TeamCheer(container, props, manager) {
       cheer_count: cheerCount,
       contribution,
     }, 'team_record_open');
+  };
+  const updateTeamDom = () => {
+    updatePercents();
+    const selected = selectedFaction();
+    const overlay = stage.querySelector('.fco-overlay');
+    if (!overlay) {
+      renderTeam();
+      return;
+    }
+    overlay.style.setProperty('--selected-color', selected?.color || right.color);
+    stage.querySelectorAll('[data-team]').forEach((button) => {
+      const faction = button.dataset.team === left.id ? left : right;
+      button.setAttribute('aria-pressed', String(button.dataset.team === selectedFactionId));
+      button.setAttribute('aria-label', `${button.dataset.team === left.id ? '向左滑动选红方' : '向右滑动选蓝方'}，${faction.name}，当前 ${faction.score}`);
+      const score = button.querySelector('.fco-faction-score');
+      const percent = button.querySelector('.fco-faction-percent');
+      if (score) score.textContent = formatScore(faction.score);
+      if (percent) percent.textContent = `${faction.percent}%`;
+    });
+    const footer = stage.querySelector('.fco-footer');
+    const summary = footer?.querySelector('.fco-result-summary');
+    const nextSummary = renderSummary();
+    if (summary) {
+      summary.outerHTML = nextSummary;
+    } else if (footer && nextSummary) {
+      footer.insertAdjacentHTML('afterbegin', nextSummary);
+    }
   };
   function renderTeam() {
     updatePercents();
@@ -1327,40 +1407,32 @@ function TeamCheer(container, props, manager) {
           -webkit-clip-path: var(--fco-shape) !important;
           clip-path: var(--fco-shape) !important;
         }
-        .fco-waveform svg {
-          animation: zhanduiWaveDrift 3.4s ease-in-out infinite alternate !important;
-        }
         .fco-wave-main {
           stroke-dasharray: 18 10 !important;
-          animation-duration: 3.2s !important;
+          animation: none !important;
         }
-        .fco-wave-secondary {
-          animation-duration: 4.1s !important;
+        .fco-wave-secondary,
+        .fco-wave-glow,
+        .fco-wave-sparks,
+        .fco-wave-ticks,
+        .fco-particles,
+        .fco-particles::before,
+        .fco-particles::after,
+        .fco-energy,
+        .fco-outline-glow,
+        .fco-outline-line,
+        .fco-vs-badge::before {
+          animation: none !important;
         }
-        .fco-wave-ticks {
-          animation: zhanduiTickDrift 2.6s linear infinite !important;
-          background-position: 0 0, 0 0;
-        }
-        @keyframes zhanduiWaveDrift {
-          0% { transform: translateX(-4px) scaleY(0.92); }
-          50% { transform: translateX(3px) scaleY(1.08); }
-          100% { transform: translateX(6px) scaleY(0.96); }
-        }
-        @keyframes zhanduiTickDrift {
-          from { background-position: 0 0, 0 0; }
-          to { background-position: 36px 0, 0 0; }
+        .fco-glass-layer,
+        .fco-timer,
+        .fco-record-button {
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
         }
         .fco-faction-side-right .fco-waveform svg,
         .fco-faction-side-right .fco-wave-ticks {
           transform: scaleX(-1);
-        }
-        .fco-faction-side-right .fco-waveform svg {
-          animation-name: zhanduiWaveDriftRight !important;
-        }
-        @keyframes zhanduiWaveDriftRight {
-          0% { transform: scaleX(-1) translateX(-4px) scaleY(0.92); }
-          50% { transform: scaleX(-1) translateX(3px) scaleY(1.08); }
-          100% { transform: scaleX(-1) translateX(6px) scaleY(0.96); }
         }
       </style>
       <section
@@ -1706,18 +1778,20 @@ function realOptionCard(container, props, options, manager) {
     const activeOption = hoveredOption || selectedOption;
     stage.innerHTML = `
       <style>
-        .prediction-card-adjust .predict-zone {
-          transform: translateY(12px) scale(0.6667) !important;
+        .prediction-card-adjust.real-clue .predict-zone {
+          transform: translateY(-18px) scale(1.3334) !important;
         }
-        .prediction-card-adjust .predict-zone.is-fading-out {
-          transform: translateY(30px) scale(0.6667) !important;
+        .prediction-card-adjust.real-clue .predict-zone.is-fading-out {
+          transform: translateY(0) scale(1.3334) !important;
         }
       </style>
-      <section class="phone-frame prediction-card-adjust" aria-label="剧情预测特效">
-        <div class="countdown-copy countdown-copy--effect ${isCardExiting ? 'is-fading-out' : ''}">
-          <span>精彩还未结束...</span>
-          <strong>${countdown}s</strong>
-        </div>
+      <section class="phone-frame prediction-card-adjust ${options.className}" aria-label="剧情预测特效">
+        ${options.className === 'real-clue' ? '' : `
+          <div class="countdown-copy countdown-copy--effect ${isCardExiting ? 'is-fading-out' : ''}">
+            <span>精彩还未结束...</span>
+            <strong>${countdown}s</strong>
+          </div>
+        `}
         <div class="predict-zone ${isCardExiting ? 'is-fading-out' : ''}">
           <article class="predict-card">
             <div class="drama-card-media ${activeOption ? `is-${activeOption}` : ''}">
@@ -1755,7 +1829,16 @@ function realOptionCard(container, props, options, manager) {
       button.addEventListener('mouseleave', () => setActiveOption(''));
       button.addEventListener('focus', () => setActiveOption(optionId));
       button.addEventListener('blur', () => setActiveOption(''));
-      button.addEventListener('click', () => selectOption(button));
+      button.addEventListener('pointerup', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectOption(button);
+      });
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.detail === 0) selectOption(button);
+      });
     });
   }
 
