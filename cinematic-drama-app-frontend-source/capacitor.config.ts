@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Cinematic Drama',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http',
   },
 };
 

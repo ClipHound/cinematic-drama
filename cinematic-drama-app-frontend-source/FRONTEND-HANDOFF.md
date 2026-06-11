@@ -1,78 +1,105 @@
-# Cinematic Drama App 前端源码交接
+# Android 源码构建说明
 
-## 技术栈
+本目录是 React 19 + Vite 8 + Capacitor 8 工程，已经包含完整的 `android/` 原生项目。
 
-- React 19
-- Vite 8
-- TypeScript
-- Tailwind CSS 4
-- React Router
-- Capacitor
+## 环境要求
 
-## 本地运行
+- Node.js 22 或更高版本
+- Android Studio 2025.2.1 或兼容版本
+- Android SDK Platform 36
+- Android Studio 自带 JDK
+
+## 当前 API 配置
+
+`.env.production` 已配置：
+
+```text
+VITE_API_BASE_URL=http://116.204.134.65
+```
+
+Android 网络策略只允许该 IP 使用明文 HTTP。服务器地址改变时，需要同时修改：
+
+```text
+.env.production
+android/app/src/main/res/xml/network_security_config.xml
+```
+
+服务器配置 HTTPS 后，请按上级目录的 `HTTPS-DEPLOYMENT.md` 切换配置。
+
+## 首次构建
 
 ```powershell
-npm install
-npm run dev
+npm ci
+npm run android:sync
+npm run android:open
 ```
 
-默认地址：`http://127.0.0.1:5174/home`
+在 Android Studio 中等待 Gradle Sync 完成，然后运行 `app`。
 
-本地开发时，Vite 会把 `/api` 请求代理到：
+## 生成调试 APK
+
+Windows：
+
+```powershell
+npm run android:apk
+```
+
+输出文件：
 
 ```text
-http://127.0.0.1:8787
+android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 配置后端地址
-
-复制 `.env.example` 为 `.env`，填写：
+也可以在 Android Studio 中使用：
 
 ```text
-VITE_API_BASE_URL=https://你的后端域名
+Build > Build Bundle(s) / APK(s) > Build APK(s)
 ```
 
-正式 Android App 必须使用手机可访问的 HTTPS 后端地址，不能使用 `127.0.0.1`。
+## 生成发布 AAB
 
-## 前端依赖的 API
+```powershell
+npm run android:aab
+```
 
-| 方法 | 地址 | 用途 |
-|---|---|---|
-| GET | `/api/dramas` | 剧目列表 |
-| GET | `/api/dramas/:id` | 作品介绍和选集 |
-| GET | `/api/dramas/:id/episodes` | 选集列表 |
-| GET | `/api/dramas/:id/episodes/:number` | 单集信息 |
-| GET | `/api/dramas/:id/episodes/:number/interactions` | 单集互动清单 |
-| GET/HEAD | `/api/videos/:id/:number` | 视频流，必须支持 Range |
-| POST | `/api/ai/search` | AI 搜索预留接口 |
-
-## 视频接口要求
-
-- 支持 `Range: bytes=start-end`。
-- 分段响应状态码为 `206 Partial Content`。
-- 返回 `Accept-Ranges`、`Content-Range`、`Content-Length`。
-- MP4 返回 `Content-Type: video/mp4`。
-- 允许前端拖动进度和跳转播放位置。
-
-## 主要目录
+输出文件：
 
 ```text
-src/pages/                 页面
-src/components/            公共组件
-src/data/catalog.ts        后端 API 数据层
-src/interaction/           动画注册表与播放时间轴
-public/assets/             动画所需资源
-public/vendor/             Lottie 运行库
+android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-## 源码包说明
+正式发布需要在 Android Studio 中配置自己的签名证书。不要把 `.jks`、`.keystore`、密码或 `keystore.properties` 放入源码包。
 
-此交接包不包含：
+## 后端要求
 
-- `node_modules`
-- `dist`
-- Android 生成工程
-- 后端视频文件
-- 编译产物
+- APK/AAB 不包含 Django 服务，后端必须单独部署。
+- 手机中的 `127.0.0.1` 和 `localhost` 指向手机自身，不能作为远程 API 地址。
+- 当前 Capacitor WebView 来源为 `http://localhost`。
+- 当前 HTTP 模式下，Django CORS 必须允许 `http://localhost`。
+- HTTPS 模式下，WebView 来源改为 `https://localhost`，Django CORS 也要同步修改。
+- 视频接口必须支持 HTTP Range、`206 Partial Content`、`Accept-Ranges`、`Content-Range` 和 `Content-Length`。
 
-安装依赖后即可运行和继续开发。
+## 日常开发流程
+
+每次修改前端后执行：
+
+```powershell
+npm run android:sync
+```
+
+不要手工修改 `android/app/src/main/assets/public/`，同步时该目录会被 `dist/` 覆盖。
+
+## Android 配置
+
+- Application ID：`com.demo.cinematicdrama`
+- App 名称：`Cinematic Drama`
+- minSdk：24
+- targetSdk：36
+- compileSdk：36
+- Web 构建目录：`dist`
+
+正式上架前应确定最终 Application ID。一旦应用发布，不应再修改包名。
+
+## 已知服务器状态
+
+2026 年 6 月 11 日检查 `http://116.204.134.65/api/dramas` 时返回 `502 Bad Gateway`。这表示 Android 工程可以编译，但服务器反向代理尚未正确连接 Django；服务器修复前 App 无法加载在线数据。

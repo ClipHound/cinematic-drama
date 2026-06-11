@@ -1,8 +1,8 @@
 {
   "name": "cinematic-drama-app",
+  "private": true,
   "version": "0.1.0",
   "description": "Cross-platform interactive short-drama viewer for AI-generated timeline experiences.",
-  "private": true,
   "license": "Apache-2.0",
   "author": "ClipHound",
   "homepage": "https://github.com/ClipHound/cinematic-drama#readme",
@@ -14,13 +14,7 @@
   "bugs": {
     "url": "https://github.com/ClipHound/cinematic-drama/issues"
   },
-  "keywords": [
-    "react",
-    "capacitor",
-    "interactive-video",
-    "short-drama",
-    "ai"
-  ],
+  "keywords": ["react", "capacitor", "interactive-video", "short-drama", "ai"],
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -30,7 +24,14 @@
     "cap:init": "cap init",
     "cap:add:android": "cap add android",
     "cap:add:ios": "cap add ios",
-    "cap:sync": "cap sync"
+    "cap:sync": "cap sync",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:aab": "npm run android:sync && cd android && gradlew.bat bundleRelease"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",

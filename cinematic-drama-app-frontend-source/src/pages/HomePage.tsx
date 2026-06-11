@@ -1,10 +1,11 @@
-import { Bot, Heart, MessageCircle, Play, Search, Star } from 'lucide-react';
+import { Bot, Heart, MessageCircle, Play, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
 import { EmptyState, ErrorState, LoadingState } from '../components/PageState';
 import { loadDramas, loadEpisodeManifest } from '../data/catalog';
 import type { DramaItem, Episode } from '../data/catalog';
+import { updateWatchProgress } from '../data/profile';
 import { loadComments, loadFavorites, postComment, setFavorite } from '../data/social';
 import type { CommentItem } from '../data/social';
 import { clearInteraction, renderInteraction } from '../interaction/components.js';
@@ -42,11 +43,24 @@ export default function HomePage() {
   const layerRefs = useRef<Array<HTMLDivElement | null>>([]);
   const timelineRef = useRef<InteractionTimelineType | null>(null);
   const queueRef = useRef<LocalEventQueue | null>(null);
+  const draggingIndexRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const pointerStartXRef = useRef(0);
   const pointerMovedRef = useRef(false);
   const previewTimerRef = useRef<number | null>(null);
+  const activeIndexRef = useRef(0);
+  const feedEpisodesRef = useRef<Episode[]>([]);
+  const lastProgressSyncRef = useRef<Record<string, number>>({});
 
   const feedEpisodes = useMemo(() => drama?.episodes || [], [drama]);
+
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  useEffect(() => {
+    feedEpisodesRef.current = feedEpisodes;
+  }, [feedEpisodes]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -111,10 +125,73 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, [feedEpisodes.length]);
 
-  const updateProgress = (index: number, video: HTMLVideoElement) => {
-    const nextProgress = Number.isFinite(video.duration) && video.duration > 0 ? video.currentTime / video.duration : 0;
+  const getVideoProgress = (video: HTMLVideoElement | null) => {
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
+    return Math.max(0, Math.min(1, video.currentTime / video.duration));
+  };
+
+  const setProgressAtIndex = (index: number, nextProgress: number) => {
     setProgress((current) => current.map((value, itemIndex) => (itemIndex === index ? nextProgress : value)));
   };
+
+  const updateProgress = (index: number, video: HTMLVideoElement) => {
+    setProgressAtIndex(index, getVideoProgress(video));
+  };
+
+  const getVideoDurationMs = (video: HTMLVideoElement | null) => {
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
+    return Math.round(video.duration * 1000);
+  };
+
+  const syncTimelineDuration = (video: HTMLVideoElement | null, index = activeIndex) => {
+    const durationMs = getVideoDurationMs(video);
+    if (durationMs > 0 && index === activeIndex && timelineRef.current) timelineRef.current.manifest.duration_ms = durationMs;
+    return durationMs;
+  };
+
+  const syncWatchProgress = useCallback(
+    (episode: Episode | null | undefined, video: HTMLVideoElement | null, options: { force?: boolean; keepalive?: boolean } = {}) => {
+      if (!episode || !video) return;
+      const currentTime = Number.isFinite(video.currentTime) && video.currentTime > 0 ? video.currentTime : 0;
+      const durationMs = getVideoDurationMs(video);
+      const progressMs = Math.max(0, Math.round(currentTime * 1000));
+      if (!durationMs && !progressMs) return;
+
+      const now = Date.now();
+      const previous = lastProgressSyncRef.current[episode.id] || 0;
+      if (!options.force && now - previous < 5000) return;
+      lastProgressSyncRef.current[episode.id] = now;
+
+      updateWatchProgress(episode.id, progressMs, durationMs || progressMs, { keepalive: options.keepalive }).catch((err) => {
+        if (!options.keepalive) setQueueStatus(err instanceof Error ? err.message : '观看进度同步失败');
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const syncCurrentProgress = (keepalive = false) => {
+      const index = activeIndexRef.current;
+      syncWatchProgress(feedEpisodesRef.current[index], videoRefs.current[index], { force: true, keepalive });
+    };
+    const onPageHide = () => syncCurrentProgress(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') syncCurrentProgress(true);
+    };
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      syncCurrentProgress(true);
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [syncWatchProgress]);
+
+  useEffect(() => {
+    return () => {
+      syncWatchProgress(feedEpisodes[activeIndex], videoRefs.current[activeIndex], { force: true });
+    };
+  }, [activeIndex, feedEpisodes, syncWatchProgress]);
 
   const enqueueEvent = (episode: Episode, pointId: string, type: string, actionData: Record<string, unknown>, atMs = 0) => {
     if (!drama) return;
@@ -173,13 +250,17 @@ export default function HomePage() {
     const video = videoRefs.current[index];
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return null;
     const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width <= 0) return null;
     const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
     const time = ratio * video.duration;
+    syncTimelineDuration(video, index);
     video.currentTime = time;
-    timelineRef.current?.seek(video.currentTime * 1000);
-    setProgress((current) => current.map((value, itemIndex) => (itemIndex === index ? ratio : value)));
-    setSeekPreview({ index, time, ratio });
-    return { time, ratio };
+    const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : time;
+    const currentRatio = getVideoProgress(video);
+    if (index === activeIndex) timelineRef.current?.seek(currentTime * 1000);
+    setProgressAtIndex(index, currentRatio);
+    setSeekPreview({ index, time: currentTime, ratio: currentRatio });
+    return { time: currentTime, ratio: currentRatio };
   };
 
   useEffect(() => {
@@ -203,16 +284,21 @@ export default function HomePage() {
 
       const manifest = await loadEpisodeManifest(currentDrama.id, episode.episodeNumber).catch(() => null);
       if (disposed || !manifest) return;
+      const durationMs = getVideoDurationMs(videoRefs.current[activeIndex]);
+      const manifestWithDuration = {
+        ...manifest,
+        duration_ms: durationMs || manifest.duration_ms,
+      } as InteractionManifest;
 
       const timeline = new InteractionTimeline({
-        manifest: manifest as InteractionManifest,
+        manifest: manifestWithDuration,
         onActivate: (point: InteractionPoint) => {
           const layer = layerRefs.current[activeIndex];
           if (!layer) return;
           setInteractionActive((current) => current.map((value, index) => (index === activeIndex ? true : value)));
           renderInteraction(layer, {
             interactionPoint: point,
-            assetBaseUrl: manifest.client_hints?.asset_base_url || '/assets/',
+            assetBaseUrl: manifestWithDuration.client_hints?.asset_base_url || '/assets/',
             deviceTier: 'MEDIUM',
             statsSnapshot: null,
             onInteract: (event: { eventType: string; actionData: Record<string, unknown> }) => {
@@ -221,6 +307,7 @@ export default function HomePage() {
               const video = videoRefs.current[activeIndex];
               if (!video) return;
               const nextTime = Number.isFinite(video.duration) ? Math.min(video.duration, video.currentTime + 10) : video.currentTime + 10;
+              syncTimelineDuration(video);
               video.currentTime = nextTime;
               timeline.seek(nextTime * 1000);
               updateProgress(activeIndex, video);
@@ -290,19 +377,33 @@ export default function HomePage() {
                 videoRefs.current[index] = node;
               }}
               data-index={index}
-              className="h-full w-full object-cover"
+              className="absolute inset-x-0 top-1/2 h-auto w-full -translate-y-1/2 object-contain"
               src={episode.videoUrl}
               muted={index !== activeIndex}
               loop
               playsInline
               preload={index < 2 ? 'auto' : 'metadata'}
               onTimeUpdate={(event) => {
+                if (draggingIndexRef.current === index) return;
                 updateProgress(index, event.currentTarget);
-                if (index === activeIndex && draggingIndex !== index) timelineRef.current?.sync(event.currentTarget.currentTime * 1000);
+                syncWatchProgress(episode, event.currentTarget);
+                if (index === activeIndex) timelineRef.current?.sync(event.currentTarget.currentTime * 1000);
               }}
-              onLoadedMetadata={(event) => updateProgress(index, event.currentTarget)}
+              onLoadedMetadata={(event) => {
+                syncTimelineDuration(event.currentTarget, index);
+                updateProgress(index, event.currentTarget);
+              }}
+              onSeeking={(event) => {
+                if (draggingIndexRef.current !== index) updateProgress(index, event.currentTarget);
+              }}
+              onSeeked={(event) => {
+                if (draggingIndexRef.current !== index) updateProgress(index, event.currentTarget);
+              }}
               onPlay={() => setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? false : value)))}
-              onPause={() => setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? true : value)))}
+              onPause={(event) => {
+                setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? true : value)));
+                syncWatchProgress(episode, event.currentTarget, { force: true });
+              }}
             />
             <div ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[45] overflow-hidden" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
@@ -322,9 +423,14 @@ export default function HomePage() {
               <Play size={25} fill="currentColor" className="translate-x-0.5" />
             </button>
 
-            <aside data-video-control className="absolute bottom-32 right-3 z-40 flex flex-col items-center gap-5 text-white">
+            <aside
+              data-video-control
+              className="absolute bottom-32 right-3 z-[80] flex flex-col items-center gap-5 text-white"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
               <button
-                className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${liked[drama.id] ? 'bg-primary-container text-white' : 'bg-black/25'}`}
+                className={`pointer-events-auto grid h-11 w-11 place-items-center rounded-full backdrop-blur ${liked[drama.id] ? 'bg-primary-container text-white' : 'bg-black/25'}`}
                 type="button"
                 aria-label="喜欢"
                 onClick={(event) => {
@@ -335,7 +441,7 @@ export default function HomePage() {
                 <Heart size={23} fill={liked[drama.id] ? 'currentColor' : 'none'} />
               </button>
               <button
-                className="grid h-11 w-11 place-items-center rounded-full bg-black/25 backdrop-blur"
+                className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full bg-black/25 backdrop-blur"
                 type="button"
                 aria-label="评论"
                 onClick={(event) => {
@@ -345,15 +451,12 @@ export default function HomePage() {
               >
                 <MessageCircle size={23} />
               </button>
-              <Link className="grid h-11 w-11 place-items-center rounded-full bg-black/25 backdrop-blur" to="/theater" aria-label="剧场">
-                <Star size={22} />
-              </Link>
             </aside>
 
-            <section className="absolute bottom-24 left-0 right-16 z-40 px-margin-page text-white">
+            <section className="pointer-events-none absolute bottom-24 left-0 right-24 z-40 px-margin-page text-white">
               <p className="mb-1 text-label-md text-primary">{drama.title} · {episode.title}</p>
               <h2 className="mb-2 text-display-lg-mobile font-bold">
-                <Link data-video-control className="inline-block" to={`/detail?drama=${drama.id}`}>
+                <Link data-video-control className="pointer-events-auto inline-block" to={`/detail?drama=${drama.id}`}>
                   {drama.title}
                 </Link>
               </h2>
@@ -376,28 +479,37 @@ export default function HomePage() {
                 if (previewTimerRef.current !== null) window.clearTimeout(previewTimerRef.current);
                 pointerStartXRef.current = event.clientX;
                 pointerMovedRef.current = false;
+                draggingIndexRef.current = index;
+                activePointerIdRef.current = event.pointerId;
                 event.currentTarget.setPointerCapture(event.pointerId);
                 setDraggingIndex(index);
                 seekFromPointer(index, event);
               }}
               onPointerMove={(event) => {
-                if (draggingIndex !== index) return;
+                if (draggingIndexRef.current !== index || activePointerIdRef.current !== event.pointerId) return;
                 event.preventDefault();
                 event.stopPropagation();
                 if (Math.abs(event.clientX - pointerStartXRef.current) > 3) pointerMovedRef.current = true;
                 seekFromPointer(index, event);
               }}
               onPointerUp={(event) => {
-                if (draggingIndex !== index) return;
+                if (draggingIndexRef.current !== index || activePointerIdRef.current !== event.pointerId) return;
                 event.preventDefault();
                 event.stopPropagation();
                 seekFromPointer(index, event);
-                event.currentTarget.releasePointerCapture(event.pointerId);
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                draggingIndexRef.current = null;
+                activePointerIdRef.current = null;
                 setDraggingIndex(null);
                 if (pointerMovedRef.current) setSeekPreview(null);
                 else previewTimerRef.current = window.setTimeout(() => setSeekPreview(null), 500);
+                syncWatchProgress(episode, videoRefs.current[index], { force: true });
               }}
               onPointerCancel={() => {
+                draggingIndexRef.current = null;
+                activePointerIdRef.current = null;
                 setDraggingIndex(null);
                 setSeekPreview(null);
               }}
@@ -406,9 +518,11 @@ export default function HomePage() {
                 if (!video || !Number.isFinite(video.duration)) return;
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();
+                syncTimelineDuration(video, index);
                 video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (event.key === 'ArrowRight' ? 5 : -5)));
                 timelineRef.current?.seek(video.currentTime * 1000);
                 updateProgress(index, video);
+                syncWatchProgress(episode, video, { force: true });
               }}
             >
               <div className="relative h-[3px] w-full overflow-visible rounded-full bg-white/30">
@@ -437,7 +551,12 @@ export default function HomePage() {
       </section>
 
       {commentEpisode ? (
-        <section data-video-control className="absolute inset-x-0 bottom-[70px] z-[70] rounded-t-2xl border-t border-white/10 bg-background/95 px-margin-page pb-4 pt-3 text-on-surface shadow-2xl backdrop-blur-2xl">
+        <section
+          data-video-control
+          className="absolute inset-x-0 bottom-[70px] z-[100] rounded-t-2xl border-t border-white/10 bg-background/95 px-margin-page pb-4 pt-3 text-on-surface shadow-2xl backdrop-blur-2xl"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
           <div className="mb-3 flex items-center justify-between">
             <div className="min-w-0">
               <h2 className="text-headline-md font-semibold">评论</h2>

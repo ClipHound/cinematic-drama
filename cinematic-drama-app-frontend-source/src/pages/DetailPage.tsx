@@ -1,4 +1,4 @@
-import { Play, Star } from 'lucide-react';
+import { Play, Sparkles, Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
@@ -14,7 +14,7 @@ function isVideoUrl(value: string) {
 
 export default function DetailPage() {
   const [searchParams] = useSearchParams();
-  const dramaId = searchParams.get('drama') || '';
+  const dramaId = searchParams.get('drama') || 'furao-dadi';
   const [drama, setDrama] = useState<DramaItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function DetailPage() {
   const posterIsVideo = isVideoUrl(drama.poster);
 
   return (
-    <main className="phone-safe relative pb-28 pt-14">
+    <main className="phone-safe relative pb-[190px] pt-14">
       <TopBar title={drama.title} />
 
       <section className="flex gap-margin-page px-margin-page py-stack-md">
@@ -92,6 +92,15 @@ export default function DetailPage() {
                 <span className="text-label-sm text-on-surface-variant">{episode.durationLabel}</span>
               </Link>
             ))}
+            {drama.hasBranchNarrative ? (
+              <Link
+                className="glass-panel flex h-16 flex-col items-center justify-center rounded-xl border border-primary/40 bg-primary/5"
+                to={`/branch?drama=${drama.id}`}
+              >
+                <Sparkles size={18} className="text-primary" />
+                <span className="text-label-sm text-primary">续写支线</span>
+              </Link>
+            ) : null}
           </div>
         ) : (
           <div className="px-margin-page">

@@ -10,7 +10,10 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.catalog.models import Drama, Episode
+from apps.catalog.metadata import imported_poster_name
 from apps.interactions.models import InteractionManifest, InteractionPoint
+from apps.media_assets.thumbnails import ensure_episode_thumbnail
+from apps.search.document_builder import build_drama_search_document, build_episode_search_document
 from apps.search.models import SearchDocument
 
 
@@ -23,8 +26,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser) -> None:
         parser.add_argument("--root", default=str(settings.LEGACY_AGENT_ROOT))
-        parser.add_argument("--slug", default="")
-        parser.add_argument("--project-id", default="")
+        parser.add_argument("--slug", default="furao-dadi")
+        parser.add_argument("--project-id", default="furao-dadi-20eps-final")
         parser.add_argument("--publish", action="store_true", default=True)
 
     def handle(self, *args, **options) -> None:
@@ -40,11 +43,13 @@ class Command(BaseCommand):
         interactions_dir = find_interactions_dir(root / "outputs", slug, project_id)
         manifests = manifest_map(interactions_dir)
         videos_dir = root / "content" / "videos" / slug
+        source_title = str(metadata.get("drama_title") or report.get("drama_title") or slug)
+        poster_name = imported_poster_name(settings.MEDIA_ROOT, slug, source_title, settings.BASE_DIR / "data")
 
         drama, _ = Drama.objects.update_or_create(
             slug=slug,
             defaults={
-                "title": str(metadata.get("drama_title") or report.get("drama_title") or slug),
+                "title": source_title,
                 "subtitle": subtitle(report),
                 "description": description(report),
                 "status": Drama.Status.PUBLISHED if options["publish"] else Drama.Status.READY,
@@ -52,14 +57,18 @@ class Command(BaseCommand):
                 "score_label": "暂无评分",
                 "source": "legacy_import",
                 "published_at": timezone.now() if options["publish"] else None,
+                **({"poster": poster_name} if poster_name else {}),
             },
         )
 
         episode_numbers = set(range(1, int(metadata.get("total_episodes") or 0) + 1))
         episode_numbers.update(manifests)
         imported_points = 0
+        manifest_payloads: dict[int, dict[str, Any]] = {}
         for number in sorted(num for num in episode_numbers if num > 0):
             manifest_json = read_optional(manifests.get(number))
+            if manifest_json:
+                manifest_payloads[number] = manifest_json
             summary = episode_summary(report, number)
             video_path = find_video(videos_dir, number)
             episode, _ = Episode.objects.update_or_create(
@@ -75,6 +84,8 @@ class Command(BaseCommand):
                     "is_published": bool(options["publish"] and video_path),
                 },
             )
+            if video_path:
+                ensure_episode_thumbnail(episode)
             if manifest_json:
                 manifest, _ = InteractionManifest.objects.update_or_create(
                     episode=episode,
@@ -104,18 +115,43 @@ class Command(BaseCommand):
                         sort_order=order,
                     )
                     imported_points += 1
-            SearchDocument.objects.update_or_create(
+            episode_doc = build_episode_search_document(
+                drama_title=drama.title,
+                episode_number=number,
+                episode_title=episode.title,
+                summary=episode_summary_record(report, number) or summary,
+                understanding=episode_result_record(report, number),
+                interactions=manifest_json,
+                characters=report.get("characters") or [],
+                relationships=report.get("relationships") or [],
+                plot_events=report.get("plot_events") or [],
+                plot_threads=report.get("plot_threads") or [],
+                genre_tags=drama.genre_tags,
+            )
+            upsert_search_document(
                 object_type=SearchDocument.ObjectType.EPISODE,
                 object_id=str(episode.id),
-                defaults={"title": f"{drama.title} 第 {number} 集", "body": summary, "tags": drama.genre_tags, "embedding_status": "pending"},
+                built=episode_doc,
             )
 
         drama.heat_label = f"{drama.episodes.count()} 集"
         drama.save(update_fields=["heat_label", "updated_at"])
-        SearchDocument.objects.update_or_create(
+        drama_doc = build_drama_search_document(
+            drama_title=drama.title,
+            subtitle=drama.subtitle,
+            description=drama.description,
+            genre_tags=drama.genre_tags,
+            summaries=report.get("episode_summaries") or report.get("results") or [],
+            characters=report.get("characters") or [],
+            relationships=report.get("relationships") or [],
+            plot_threads=report.get("plot_threads") or [],
+            branch_narrative={},
+            interactions_by_episode=manifest_payloads,
+        )
+        upsert_search_document(
             object_type=SearchDocument.ObjectType.DRAMA,
             object_id=str(drama.id),
-            defaults={"title": drama.title, "body": f"{drama.subtitle}\n{drama.description}", "tags": drama.genre_tags, "embedding_status": "pending"},
+            built=drama_doc,
         )
         self.stdout.write(self.style.SUCCESS(f"Imported {drama.slug}: {drama.episodes.count()} episodes, {imported_points} points"))
 
@@ -195,6 +231,29 @@ def episode_summary(report: dict[str, Any], number: int) -> str:
             if int(item.get("episode_num") or 0) == number:
                 return str(item.get("summary") or "")
     return ""
+
+
+def episode_summary_record(report: dict[str, Any], number: int) -> dict[str, Any]:
+    for item in report.get("episode_summaries", []):
+        if int(item.get("episode_num") or 0) == number:
+            return item
+    return {}
+
+
+def episode_result_record(report: dict[str, Any], number: int) -> dict[str, Any]:
+    for item in report.get("results", []):
+        if int(item.get("episode_num") or 0) == number:
+            return item
+    return {}
+
+
+def upsert_search_document(*, object_type: str, object_id: str, built) -> None:
+    current = SearchDocument.objects.filter(object_type=object_type, object_id=object_id).first()
+    changed = current is None or current.title != built.title or current.body != built.body or list(current.tags or []) != built.tags
+    defaults = {"title": built.title, "body": built.body, "tags": built.tags}
+    if changed:
+        defaults.update({"embedding_status": "pending", "embedding_vector": []})
+    SearchDocument.objects.update_or_create(object_type=object_type, object_id=object_id, defaults=defaults)
 
 
 def duration_from_report(report: dict[str, Any], number: int) -> int:

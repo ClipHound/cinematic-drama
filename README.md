@@ -28,7 +28,8 @@ Built by **ClipHound**, the open-source identity of the team **给狗剪毛**.
 - **Interaction design:** the pipeline selects precise timeline windows and emits validated JSON manifests for 12 component types.
 - **Interactive playback:** the React viewer loads manifests, triggers overlays against video time, provides animation and haptic feedback, and batches interaction events to the API.
 - **Content platform:** Django serves dramas, episodes, video files, manifests, device-based profiles, favorites, comments, analytics, and pipeline jobs.
-- **Content retrieval:** Django provides indexed keyword search; the retained offline agent also includes embedding-based cosine retrieval and Qdrant vector memory.
+- **RAG search and chat:** Django provides hybrid keyword/embedding retrieval, OpenAI-compatible tool calling, SSE streaming answers, and playable recommendation cards with a no-keyword-provider fallback.
+- **Branch narrative:** pre-generated DAG packages let viewers continue a completed drama through multiple choices and endings.
 - **Cross-platform delivery:** the same React application runs on the web and can be packaged for Android or iOS through Capacitor.
 
 ## Architecture
@@ -78,12 +79,12 @@ Selection rules reject emotionally inappropriate combinations and validate requi
 
 ```text
 cinematic-drama-app-frontend-source/  React/Vite viewer and Capacitor shell
-  src/pages/                          Seven routed application pages
+  src/pages/                          Eight routes, including AI search and branch narrative
   src/interaction/                    Timeline runtime and component renderers
 django-backend/                       Django REST API with eight domain apps
   apps/catalog/                       Drama and episode metadata
   apps/interactions/                  Manifests, points, events and aggregates
-  apps/search/                        Online search index and API
+  apps/search/                        Hybrid retrieval, embeddings and AI chat services
   apps/pipeline/                      Offline-processing job records
 drama-understanding-agent/            Offline understanding and design pipeline
   src/drama_agent/                    VLM, ASR, memory, API and orchestration

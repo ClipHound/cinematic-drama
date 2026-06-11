@@ -49,9 +49,9 @@ export default function TheaterPage() {
         <section className="px-margin-page pb-stack-lg">
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-surface-container">
             {featuredEpisode ? (
-              <video className="h-56 w-full object-cover opacity-80" src={featuredEpisode.videoUrl} muted loop playsInline autoPlay />
+              <video className="h-56 w-full object-cover object-[center_28%] opacity-80" src={featuredEpisode.videoUrl} muted loop playsInline autoPlay />
             ) : isVideoUrl(featuredDrama.cover) ? (
-              <video className="h-56 w-full object-cover opacity-80" src={featuredDrama.cover} muted loop playsInline autoPlay />
+              <video className="h-56 w-full object-cover object-[center_28%] opacity-80" src={featuredDrama.cover} muted loop playsInline autoPlay />
             ) : (
               <img className="h-56 w-full object-cover opacity-80" src={featuredDrama.cover} alt={featuredDrama.title} />
             )}

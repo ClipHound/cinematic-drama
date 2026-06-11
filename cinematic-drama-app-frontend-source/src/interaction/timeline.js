@@ -29,18 +29,26 @@
   }
 
   seek(ms) {
-    this.offsetMs = Math.max(0, Math.min(ms, this.manifest.duration_ms));
+    this.offsetMs = this.clampMs(ms);
     this.currentMs = this.offsetMs;
     this.startedAt = performance.now() - this.offsetMs;
-    if (this.activePoint) {
+    if (this.activePoint && !this.isPointActiveAt(this.activePoint, this.currentMs)) {
       this.dismissActive('skip');
     }
+    this.rearmCompletedPoints(this.currentMs);
     this.onTick?.(this.currentMs);
   }
 
   sync(ms) {
-    this.currentMs = Math.max(0, Math.min(ms, this.manifest.duration_ms));
+    const previousMs = this.currentMs;
+    this.currentMs = this.clampMs(ms);
     this.offsetMs = this.currentMs;
+    if (this.activePoint && !this.isPointActiveAt(this.activePoint, this.currentMs)) {
+      this.dismissActive(this.currentMs > this.activePoint.end_ms ? 'timeout' : 'skip');
+    }
+    if (this.currentMs < previousMs - 750) {
+      this.rearmCompletedPoints(this.currentMs);
+    }
     this.matchCurrentPoint();
     this.onTick?.(this.currentMs);
   }
@@ -93,5 +101,21 @@
     this.activePoint = null;
     this.onDismiss?.(point, reason);
   }
-}
 
+  clampMs(ms) {
+    const durationMs = Number.isFinite(this.manifest.duration_ms) ? this.manifest.duration_ms : 0;
+    return Math.max(0, Math.min(ms, durationMs));
+  }
+
+  isPointActiveAt(point, ms) {
+    return ms >= point.start_ms && ms <= point.end_ms;
+  }
+
+  rearmCompletedPoints(ms) {
+    this.manifest.interaction_points.forEach((point) => {
+      if (ms <= point.end_ms) {
+        this.completed.delete(point.id);
+      }
+    });
+  }
+}

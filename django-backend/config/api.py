@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.decorators import api_view, parser_classes
@@ -20,6 +22,18 @@ from apps.comments.models import Comment
 from apps.interactions.models import InteractionAggregate, InteractionEvent, InteractionManifest, InteractionPoint
 from apps.pipeline.models import PipelineJob, PipelineStage
 from apps.search.models import SearchDocument
+from apps.search.services import (
+    AiProviderError,
+    choose_search_query,
+    fallback_search_query,
+    iter_chat_text,
+    public_recommendations,
+    reply_uses_recommendations,
+    sanitize_chat_reply,
+    search_catalog,
+)
+
+BASE_DIR = settings.BASE_DIR
 
 
 def published_dramas():
@@ -57,16 +71,36 @@ def poster_or_placeholder(request, drama: Drama, field_name: str) -> str:
 
 
 def episode_item(request, episode: Episode) -> dict[str, Any]:
+    total_episodes = visible_episodes(episode.drama).count()
     return {
         "id": str(episode.id),
         "episodeNumber": episode.episode_number,
         "title": episode.title,
         "durationLabel": episode.duration_label,
         "videoUrl": request.build_absolute_uri(f"/api/videos/{episode.drama.slug}/{episode.episode_number}"),
+        "thumbnail": request.build_absolute_uri(episode.thumbnail.url) if episode.thumbnail else "",
         "interactionUrl": request.build_absolute_uri(
             f"/api/dramas/{episode.drama.slug}/episodes/{episode.episode_number}/interactions"
         ),
+        "totalEpisodes": total_episodes,
+        "isLastEpisode": episode.episode_number >= total_episodes,
     }
+
+
+def search_result_image(request, drama: Drama, episode: Episode | None = None) -> str:
+    if episode and episode.thumbnail:
+        return request.build_absolute_uri(episode.thumbnail.url)
+    if drama.poster:
+        return request.build_absolute_uri(drama.poster.url)
+    target_episode = episode or visible_episodes(drama).first()
+    return request.build_absolute_uri(target_episode.thumbnail.url) if target_episode and target_episode.thumbnail else ""
+
+
+BRANCH_NARRATIVE_DIR = BASE_DIR / "data" / "branch_narratives"
+
+
+def drama_has_branch_narrative(drama: Drama) -> bool:
+    return (BRANCH_NARRATIVE_DIR / f"{drama.slug}.json").is_file()
 
 
 def drama_item(request, drama: Drama, *, include_episodes: bool = True) -> dict[str, Any]:
@@ -82,6 +116,17 @@ def drama_item(request, drama: Drama, *, include_episodes: bool = True) -> dict[
         "score": drama.score_label,
         "description": drama.description,
         "episodes": [episode_item(request, episode) for episode in episodes],
+        "hasBranchNarrative": drama_has_branch_narrative(drama),
+        "totalEpisodes": len(episodes),
+    }
+
+
+def favorite_item(request, favorite: Favorite) -> dict[str, Any]:
+    first_episode = visible_episodes(favorite.drama).first()
+    return {
+        **drama_item(request, favorite.drama, include_episodes=False),
+        "favoriteAt": favorite.created_at,
+        "firstEpisodeNumber": first_episode.episode_number if first_episode else None,
     }
 
 
@@ -162,6 +207,17 @@ def episode_manifest(request, slug: str, number: int):
     return Response(manifest_payload(request, manifest))
 
 
+@api_view(["GET"])
+def branch_narrative(request, slug: str):
+    drama = get_object_or_404(published_dramas(), slug=slug)
+    file_path = BRANCH_NARRATIVE_DIR / f"{drama.slug}.json"
+    if not file_path.is_file():
+        raise Http404("branch narrative not found")
+    with file_path.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    return Response(data)
+
+
 @api_view(["GET", "HEAD"])
 def video_stream(request, slug: str, number: int):
     drama = get_object_or_404(published_dramas(), slug=slug)
@@ -174,7 +230,53 @@ def video_stream(request, slug: str, number: int):
         raise Http404("video file missing")
     if not path.exists():
         raise Http404("video file missing")
-    return FileResponse(path.open("rb"), content_type="video/mp4")
+    file_size = path.stat().st_size
+    range_header = request.headers.get("Range", "")
+    if range_header.startswith("bytes="):
+        try:
+            start_text, end_text = range_header.removeprefix("bytes=").split("-", 1)
+            if not start_text and not end_text:
+                raise ValueError
+            if start_text:
+                start = int(start_text)
+                end = int(end_text) if end_text else file_size - 1
+            else:
+                suffix_length = int(end_text)
+                start = max(file_size - suffix_length, 0)
+                end = file_size - 1
+        except ValueError:
+            return HttpResponse(status=416, headers={"Content-Range": f"bytes */{file_size}"})
+        if start >= file_size or end < start:
+            return HttpResponse(status=416, headers={"Content-Range": f"bytes */{file_size}"})
+        end = min(end, file_size - 1)
+        length = end - start + 1
+
+        def iter_file():
+            with path.open("rb") as handle:
+                handle.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = handle.read(min(8192, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        return StreamingHttpResponse(
+            iter_file(),
+            status=206,
+            content_type="video/mp4",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+            },
+        )
+    return FileResponse(
+        path.open("rb"),
+        content_type="video/mp4",
+        headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+    )
 
 
 @api_view(["GET"])
@@ -193,9 +295,12 @@ def profile(request):
                 "favorites": Favorite.objects.filter(device_user=user).count(),
             },
             "continueWatching": {
+                "episodeId": str(latest.episode.id),
                 "dramaId": latest.drama.slug,
                 "episodeNumber": latest.episode.episode_number,
                 "title": f"{latest.drama.title} · {latest.episode.title}",
+                "progressMs": latest.progress_ms,
+                "durationMs": latest.duration_ms,
             }
             if latest
             else None,
@@ -207,13 +312,16 @@ def profile(request):
 def history(request):
     user = get_device_user(request)
     progress = WatchProgress.objects.filter(device_user=user).select_related("drama", "episode")[:50]
-    events = InteractionEvent.objects.filter(device_user=user).select_related("drama", "episode")[:50]
+    events = InteractionEvent.objects.filter(device_user=user).select_related("drama", "episode", "interaction_point")[:50]
     return Response(
         {
             "watchProgress": [
                 {
+                    "episodeId": str(item.episode.id),
                     "dramaId": item.drama.slug,
+                    "dramaTitle": item.drama.title,
                     "episodeNumber": item.episode.episode_number,
+                    "episodeTitle": item.episode.title,
                     "title": f"{item.drama.title} · {item.episode.title}",
                     "progressMs": item.progress_ms,
                     "durationMs": item.duration_ms,
@@ -226,7 +334,13 @@ def history(request):
                     "eventId": event.event_id,
                     "eventType": event.event_type,
                     "dramaId": event.drama.slug,
+                    "dramaTitle": event.drama.title,
                     "episodeNumber": event.episode.episode_number,
+                    "episodeTitle": event.episode.title,
+                    "pointId": event.interaction_point.point_key if event.interaction_point else None,
+                    "pointTitle": event.interaction_point.title if event.interaction_point else None,
+                    "atMs": event.at_ms,
+                    "actionData": event.action_data,
                     "receivedAt": event.received_at,
                 }
                 for event in events
@@ -239,7 +353,7 @@ def history(request):
 def favorites(request):
     user = get_device_user(request)
     rows = Favorite.objects.filter(device_user=user).select_related("drama")
-    return Response({"favorites": [drama_item(request, favorite.drama, include_episodes=False) for favorite in rows]})
+    return Response({"favorites": [favorite_item(request, favorite) for favorite in rows]})
 
 
 @api_view(["PUT", "DELETE"])
@@ -337,7 +451,11 @@ def interactions(request):
                     payload={"event_id": event_id},
                 )
                 if row.event_type == "like":
-                    Favorite.objects.get_or_create(device_user=user, drama=drama)
+                    liked = row.action_data.get("liked")
+                    if liked is False:
+                        Favorite.objects.filter(device_user=user, drama=drama).delete()
+                    else:
+                        Favorite.objects.get_or_create(device_user=user, drama=drama)
                 if point:
                     aggregate, _ = InteractionAggregate.objects.get_or_create(
                         interaction_point=point,
@@ -423,15 +541,32 @@ def search_results(request, query: str):
         if doc.object_type == SearchDocument.ObjectType.DRAMA:
             drama = Drama.objects.filter(pk=doc.object_id).first()
             if drama:
-                result.update({"dramaId": drama.slug, "subtitle": drama.subtitle, "poster": poster_or_placeholder(request, drama, "poster")})
+                result.update({"dramaId": drama.slug, "subtitle": drama.subtitle, "poster": search_result_image(request, drama)})
         elif doc.object_type == SearchDocument.ObjectType.EPISODE:
             episode = Episode.objects.filter(pk=doc.object_id).select_related("drama").first()
             if episode:
-                result.update({"dramaId": episode.drama.slug, "episodeNumber": episode.episode_number})
+                result.update({"dramaId": episode.drama.slug, "episodeNumber": episode.episode_number, "poster": search_result_image(request, episode.drama, episode)})
         results.append(result)
     if results:
         return results
-    dramas_qs = published_dramas().filter(Q(title__icontains=query) | Q(subtitle__icontains=query) | Q(description__icontains=query))
+    dramas_qs = list(published_dramas().filter(
+        Q(slug__icontains=query)
+        | Q(title__icontains=query)
+        | Q(subtitle__icontains=query)
+        | Q(description__icontains=query)
+    )[:20])
+    seen_drama_ids = {drama.id for drama in dramas_qs}
+    query_text = query.casefold()
+    for drama in published_dramas():
+        if len(dramas_qs) >= 20:
+            break
+        if drama.id in seen_drama_ids:
+            continue
+        genre_text = " ".join(str(tag) for tag in (drama.genre_tags or [])).casefold()
+        if query_text not in genre_text:
+            continue
+        dramas_qs.append(drama)
+        seen_drama_ids.add(drama.id)
     return [
         {
             "type": "drama",
@@ -439,7 +574,7 @@ def search_results(request, query: str):
             "title": drama.title,
             "subtitle": drama.subtitle,
             "snippet": drama.description[:160],
-            "poster": poster_or_placeholder(request, drama, "poster"),
+            "poster": search_result_image(request, drama),
         }
         for drama in dramas_qs[:20]
     ]
@@ -454,8 +589,101 @@ def search(request):
 @api_view(["POST"])
 def ai_search(request):
     query = str(request.data.get("query") or "").strip()
-    results = search_results(request, query) if query else []
+    recommendations = search_catalog(request, query, limit=20) if query else []
+    public_items = public_recommendations(recommendations)
+    results = [
+        {
+            "type": item.get("type"),
+            "dramaId": item.get("dramaId"),
+            "episodeNumber": item.get("episodeNumber"),
+            "title": item.get("title"),
+            "subtitle": item.get("subtitle"),
+            "snippet": item.get("reason"),
+            "poster": item.get("imageUrl"),
+        }
+        for item in public_items
+    ]
     return Response({"status": "ok", "message": f"找到 {len(results)} 个相关结果。", "results": results})
+
+
+def sse_event(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@api_view(["POST"])
+def ai_chat(request):
+    raw_messages = request.data.get("messages") if isinstance(request.data, dict) else None
+    mode = str(request.data.get("mode") or "fast").strip().casefold() if isinstance(request.data, dict) else "fast"
+    if mode not in {"fast", "smart"}:
+        mode = "fast"
+    if not isinstance(raw_messages, list):
+        raw_messages = []
+    messages = [
+        {"role": str(item.get("role") or "user"), "content": str(item.get("content") or "").strip()}
+        for item in raw_messages
+        if isinstance(item, dict) and str(item.get("content") or "").strip()
+    ]
+    query = next((item["content"] for item in reversed(messages) if item["role"] == "user"), "")
+
+    def event_stream():
+        yield sse_event("message_start", {"status": "ok", "mode": mode})
+        if not query:
+            yield sse_event("error", {"message": "请输入想搜索的剧情或剧名。"})
+            yield sse_event("message_end", {"status": "error"})
+            return
+
+        if mode == "fast":
+            yield sse_event("progress", {"message": "正在快速匹配需求"})
+            if settings.AI_CHAT_API_KEY and settings.AI_CHAT_MODEL:
+                search_query, planned_by_model, direct_response = query, False, ""
+            else:
+                search_query, planned_by_model, direct_response = fallback_search_query(messages), False, ""
+        else:
+            yield sse_event("progress", {"message": "正在理解你的需求"})
+            try:
+                search_query, planned_by_model, direct_response = choose_search_query(messages)
+            except AiProviderError:
+                search_query, planned_by_model, direct_response = fallback_search_query(messages), False, ""
+
+        if direct_response and not search_query:
+            yield sse_event("text_delta", {"text": direct_response})
+            yield sse_event("message_end", {"status": "ok"})
+            return
+
+        recommendations = []
+        if search_query:
+            yield sse_event("tool_call_start", {"toolName": "search_catalog", "query": search_query, "plannedByModel": planned_by_model})
+            recommendations = search_catalog(request, search_query, limit=3)
+            yield sse_event("tool_call_result", {"toolName": "search_catalog", "count": len(recommendations)})
+            yield sse_event("progress", {"message": "正在整理回复" if recommendations else "正在生成回复"})
+        else:
+            yield sse_event("progress", {"message": "正在生成回复"})
+
+        try:
+            chunks = []
+            for chunk in iter_chat_text(messages, recommendations):
+                chunks.append(chunk)
+            raw_reply_text = "".join(chunks)
+            used_recommendations = reply_uses_recommendations(raw_reply_text, recommendations) if recommendations else False
+            reply_text = sanitize_chat_reply(raw_reply_text) if used_recommendations else raw_reply_text
+            if reply_text:
+                yield sse_event("text_delta", {"text": reply_text})
+        except AiProviderError:
+            if recommendations:
+                yield sse_event("text_delta", {"text": "可以先看下面这些推荐，题材和剧情节奏更贴近你的需求。"})
+                used_recommendations = True
+            else:
+                fallback = "回复暂时不可用，请稍后再试。"
+                yield sse_event("error", {"message": fallback})
+                yield sse_event("text_delta", {"text": fallback})
+        if recommendations and used_recommendations:
+            yield sse_event("recommendations", {"items": public_recommendations(recommendations, limit=3)})
+        yield sse_event("message_end", {"status": "ok"})
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream; charset=utf-8")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @api_view(["POST"])

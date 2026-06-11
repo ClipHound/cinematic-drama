@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import BranchNarrativePage from './pages/BranchNarrativePage';
 import DetailPage from './pages/DetailPage';
 import HomePage from './pages/HomePage';
 import PlayerPage from './pages/PlayerPage';
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/home" element={<HomePage />} />
         <Route path="/detail" element={<DetailPage />} />
         <Route path="/player" element={<PlayerPage />} />
+        <Route path="/branch" element={<BranchNarrativePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/ai" element={<AiSearchPage />} />
         <Route path="/theater" element={<TheaterPage />} />

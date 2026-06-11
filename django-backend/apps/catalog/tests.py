@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from django.test import TestCase
 from django.utils import timezone
+from django.conf import settings
 from rest_framework.test import APIClient
 
-from apps.analytics.models import Favorite
+from apps.analytics.models import Favorite, WatchProgress
 from apps.catalog.models import Drama, Episode
 from apps.comments.models import Comment
 from apps.interactions.models import InteractionEvent, InteractionManifest, InteractionPoint
@@ -55,6 +56,10 @@ class PublicApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["dramas"][0]["id"], "demo-drama")
 
+        response = self.client.get("/api/search", {"q": "互动"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"][0]["dramaId"], "demo-drama")
+
         response = self.client.get("/api/dramas/demo-drama/episodes/1/interactions")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["interaction_points"][0]["id"], "ip_test")
@@ -69,6 +74,21 @@ class PublicApiTests(TestCase):
         response = self.client.put("/api/users/me/favorites/demo-drama", **headers)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Favorite.objects.filter(drama=self.drama).exists())
+
+        response = self.client.get("/api/users/me/favorites", **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["favorites"][0]["id"], "demo-drama")
+        self.assertEqual(response.data["favorites"][0]["firstEpisodeNumber"], 1)
+        self.assertIn("favoriteAt", response.data["favorites"][0])
+
+        response = self.client.put(
+            f"/api/users/me/progress/{self.episode.id}",
+            {"progressMs": 2500, "durationMs": 10000},
+            format="json",
+            **headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(WatchProgress.objects.filter(episode=self.episode, progress_ms=2500).exists())
 
         response = self.client.post(
             "/api/comments",
@@ -97,6 +117,60 @@ class PublicApiTests(TestCase):
         self.assertEqual(response.data["accepted"], ["evt-1"])
         self.assertEqual(InteractionEvent.objects.count(), 1)
 
+        response = self.client.get("/api/users/me/profile", **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["stats"]["watchedEpisodes"], 1)
+        self.assertEqual(response.data["stats"]["interactions"], 1)
+        self.assertEqual(response.data["stats"]["favorites"], 1)
+        self.assertEqual(response.data["continueWatching"]["episodeId"], str(self.episode.id))
+        self.assertEqual(response.data["continueWatching"]["progressMs"], 1200)
+
+        response = self.client.get("/api/users/me/history", **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["watchProgress"][0]["episodeId"], str(self.episode.id))
+        self.assertEqual(response.data["watchProgress"][0]["dramaTitle"], "测试短剧")
+        self.assertEqual(response.data["interactions"][0]["pointId"], "ip_test")
+        self.assertEqual(response.data["interactions"][0]["pointTitle"], "测试互动")
+        self.assertEqual(response.data["interactions"][0]["atMs"], 1200.0)
+
         response = self.client.post("/api/interactions", payload, format="json", **headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["duplicated"], ["evt-1"])
+
+        unlike_payload = {
+            "events": [
+                {
+                    "id": "evt-unlike",
+                    "dramaId": "demo-drama",
+                    "episodeNumber": 1,
+                    "pointId": "feed-like",
+                    "type": "like",
+                    "actionData": {"liked": False},
+                    "atMs": 1500,
+                }
+            ]
+        }
+        response = self.client.post("/api/interactions", unlike_payload, format="json", **headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Favorite.objects.filter(drama=self.drama).exists())
+
+    def test_video_stream_supports_range_requests(self) -> None:
+        video_path = settings.MEDIA_ROOT / "test-range-video.mp4"
+        video_path.parent.mkdir(parents=True, exist_ok=True)
+        video_path.write_bytes(b"0123456789")
+        self.episode.source_video_path = str(video_path)
+        self.episode.save(update_fields=["source_video_path", "updated_at"])
+
+        response = self.client.get("/api/videos/demo-drama/1")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Accept-Ranges"], "bytes")
+
+        response = self.client.get("/api/videos/demo-drama/1", HTTP_RANGE="bytes=2-5")
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(response.headers["Content-Range"], "bytes 2-5/10")
+        self.assertEqual(b"".join(response.streaming_content), b"2345")
+
+        response = self.client.get("/api/videos/demo-drama/1", HTTP_RANGE="bytes=-3")
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(response.headers["Content-Range"], "bytes 7-9/10")
+        self.assertEqual(b"".join(response.streaming_content), b"789")

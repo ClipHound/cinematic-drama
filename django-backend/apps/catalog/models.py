@@ -58,6 +58,7 @@ class Episode(models.Model):
     description = models.TextField(blank=True)
     duration_ms = models.PositiveIntegerField(default=0)
     video_file = models.FileField(upload_to="videos/", blank=True)
+    thumbnail = models.ImageField(upload_to="thumbnails/", blank=True)
     source_video_path = models.CharField(max_length=600, blank=True)
     video_status = models.CharField(max_length=24, choices=VideoStatus.choices, default=VideoStatus.UPLOADED, db_index=True)
     manifest_status = models.CharField(max_length=24, choices=ManifestStatus.choices, default=ManifestStatus.MISSING, db_index=True)
