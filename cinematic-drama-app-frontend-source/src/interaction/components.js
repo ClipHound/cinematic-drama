@@ -68,9 +68,10 @@ function createStage(container, props, manager, className, title, subtitle) {
   return node.querySelector('.real-body');
 }
 
-function createOriginalStage(container, cssPath, extraCssPaths = []) {
+function createOriginalStage(container, cssPath, extraCssPaths = [], waitForStyles = false) {
   const host = document.createElement('section');
   host.className = 'original-effect-host';
+  if (waitForStyles) host.style.visibility = 'hidden';
   isolateInteractionEvents(host);
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
@@ -131,6 +132,26 @@ function createOriginalStage(container, cssPath, extraCssPaths = []) {
     </main>
   `;
   container.appendChild(host);
+  if (waitForStyles) {
+    const stylesheets = [...shadow.querySelectorAll('link[rel="stylesheet"]')];
+    const reveal = () => window.requestAnimationFrame(() => {
+      host.style.visibility = 'visible';
+    });
+    const pendingStylesheets = stylesheets.filter((stylesheet) => !stylesheet.sheet);
+    if (!pendingStylesheets.length) {
+      reveal();
+    } else {
+      let remaining = pendingStylesheets.length;
+      const markLoaded = () => {
+        remaining -= 1;
+        if (remaining === 0) reveal();
+      };
+      pendingStylesheets.forEach((stylesheet) => {
+        stylesheet.addEventListener('load', markLoaded, { once: true });
+        stylesheet.addEventListener('error', markLoaded, { once: true });
+      });
+    }
+  }
   return shadow.querySelector('.effect-stage');
 }
 
@@ -665,7 +686,7 @@ function SugarStorm(container, props) {
     asset('sweet-demo/effects/sweet/heart-bubble.svg'),
     asset('sweet-demo/effects/sweet/heart-sparkle.svg'),
   ];
-  const stage = createOriginalStage(container, asset('sweet-demo/src/styles/app.css'));
+  const stage = createOriginalStage(container, asset('sweet-demo/src/styles/app.css'), [], true);
   const MAX_SWEET_LEVEL = 100;
   const MAX_PARTICLES = 45;
   let sweetLevel = 0;

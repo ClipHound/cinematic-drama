@@ -404,7 +404,7 @@ export default function HomePage() {
         {feedEpisodes.map((episode, index) => (
           <article
             key={episode.id}
-            className="relative h-dvh snap-start overflow-hidden bg-black"
+            className="relative h-dvh snap-start snap-always overflow-hidden bg-black"
             onClick={(event) => {
               if (interactionActive[index]) return;
               if ((event.target as HTMLElement).closest('[data-video-control]')) return;
@@ -448,7 +448,7 @@ export default function HomePage() {
                 syncWatchProgress(episode, event.currentTarget, { force: true });
               }}
             />
-            <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[45] overflow-hidden" />
+            <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[90] overflow-hidden" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
 
             <button
