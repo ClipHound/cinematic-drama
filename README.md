@@ -23,6 +23,12 @@ END-META -->
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6)](https://www.typescriptlang.org/)
 [![Android](https://img.shields.io/badge/Android-Capacitor-3DDC84)](https://capacitorjs.com/)
 
+## 在线实机演示
+
+**演示地址：[https://litmoon.cn/Demo-ByteDance/Video](https://litmoon.cn/Demo-ByteDance/Video)**
+
+演示覆盖短剧列表与播放、剧情高光时间点互动、动画反馈、AI 搜剧和分支剧情等核心场景。
+
 由 **给狗剪毛** 团队开发，开源身份为 **ClipHound**。
 
 ## 项目要解决的问题
