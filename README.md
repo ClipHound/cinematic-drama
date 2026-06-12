@@ -20,6 +20,12 @@ END-META -->
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node.js-22%2B-339933)](https://nodejs.org/)
 
+## Live Demo
+
+- [Project website](https://litmoon.cn/)
+- [Promotional video](https://litmoon.cn/Demo-ByteDance/Video)
+- The compressed MP4 and poster are stored in `cinematic-drama-app-frontend-source/public/assets/promo/`.
+
 Built by **ClipHound**, the open-source identity of the team **给狗剪毛**.
 
 ## What It Does

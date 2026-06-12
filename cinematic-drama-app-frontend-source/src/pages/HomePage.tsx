@@ -1,4 +1,5 @@
 import { Bot, Heart, MessageCircle, Play, Search } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import BottomNav from '../components/BottomNav';
@@ -50,7 +51,13 @@ export default function HomePage() {
   const previewTimerRef = useRef<number | null>(null);
   const activeIndexRef = useRef(0);
   const feedEpisodesRef = useRef<Episode[]>([]);
+  const feedRef = useRef<HTMLElement | null>(null);
+  const swipePointerIdRef = useRef<number | null>(null);
+  const swipeStartYRef = useRef(0);
+  const swipeBlockedRef = useRef(false);
+  const swipeConsumedRef = useRef(false);
   const lastProgressSyncRef = useRef<Record<string, number>>({});
+  const soundUnlockedRef = useRef(Capacitor.isNativePlatform());
 
   const feedEpisodes = useMemo(() => drama?.episodes || [], [drama]);
 
@@ -105,25 +112,6 @@ export default function HomePage() {
   useEffect(() => () => {
     if (previewTimerRef.current !== null) window.clearTimeout(previewTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    const nodes = videoRefs.current.filter(Boolean) as HTMLVideoElement[];
-    if (!nodes.length) return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!visible) return;
-        const index = Number((visible.target as HTMLElement).dataset.index);
-        if (Number.isFinite(index)) setActiveIndex(index);
-      },
-      { threshold: [0.62] },
-    );
-
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [feedEpisodes.length]);
 
   const getVideoProgress = (video: HTMLVideoElement | null) => {
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
@@ -263,11 +251,104 @@ export default function HomePage() {
     return { time: currentTime, ratio: currentRatio };
   };
 
+  const playVideo = async (video: HTMLVideoElement | null, options: { withSound?: boolean } = {}) => {
+    if (!video) return false;
+    video.playsInline = true;
+    video.muted = !options.withSound;
+    try {
+      await video.play();
+      return true;
+    } catch {
+      if (!options.withSound) return false;
+      video.muted = true;
+      try {
+        await video.play();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  const activateVideo = useCallback((index: number) => {
+    videoRefs.current.forEach((video, itemIndex) => {
+      if (!video) return;
+      if (itemIndex !== index) {
+        video.pause();
+        video.muted = true;
+        return;
+      }
+      void playVideo(video, { withSound: soundUnlockedRef.current });
+    });
+  }, []);
+
+  const handleFeedScroll = useCallback((event: React.UIEvent<HTMLElement>) => {
+    const feed = event.currentTarget;
+    if (feed.clientHeight <= 0 || !feedEpisodes.length) return;
+    const nextIndex = Math.max(0, Math.min(feedEpisodes.length - 1, Math.round(feed.scrollTop / feed.clientHeight)));
+    if (nextIndex === activeIndexRef.current) return;
+    activeIndexRef.current = nextIndex;
+    activateVideo(nextIndex);
+    setActiveIndex(nextIndex);
+  }, [activateVideo, feedEpisodes.length]);
+
+  const handleFeedPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse') return;
+    swipePointerIdRef.current = event.pointerId;
+    swipeStartYRef.current = event.clientY;
+    swipeBlockedRef.current = Boolean((event.target as HTMLElement).closest('[data-video-control]'));
+    swipeConsumedRef.current = false;
+    if (!swipeBlockedRef.current) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const finishFeedSwipe = (event: React.PointerEvent<HTMLElement>) => {
+    if (swipePointerIdRef.current !== event.pointerId) return;
+    const blocked = swipeBlockedRef.current;
+    const deltaY = event.clientY - swipeStartYRef.current;
+    swipePointerIdRef.current = null;
+    swipeBlockedRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (blocked || Math.abs(deltaY) < 36 || !feedEpisodes.length) return;
+
+    const direction = deltaY < 0 ? 1 : -1;
+    const nextIndex = Math.max(0, Math.min(feedEpisodes.length - 1, activeIndexRef.current + direction));
+    if (nextIndex === activeIndexRef.current) return;
+    swipeConsumedRef.current = true;
+    event.preventDefault();
+    activeIndexRef.current = nextIndex;
+    activateVideo(nextIndex);
+    setActiveIndex(nextIndex);
+    feedRef.current?.scrollTo({ top: nextIndex * (feedRef.current.clientHeight || 0), behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (!feedEpisodes.length) return;
+    activateVideo(activeIndex);
+  }, [activeIndex, activateVideo, feedEpisodes.length]);
+
+  const togglePlaybackAt = async (index: number) => {
+    const video = videoRefs.current[index];
+    if (!video) return;
+    soundUnlockedRef.current = true;
+    video.muted = false;
+    if (video.paused) {
+      const played = await playVideo(video, { withSound: true });
+      if (played) {
+        setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? false : value)));
+      }
+      return;
+    }
+    video.pause();
+  };
+
   useEffect(() => {
     if (!drama || !feedEpisodes.length) return undefined;
     const currentDrama = drama;
     let disposed = false;
-    const episode = feedEpisodes[activeIndex];
+    const timelineIndex = activeIndex;
+    const episode = feedEpisodes[timelineIndex];
     if (!episode) return undefined;
 
     async function activate() {
@@ -275,16 +356,11 @@ export default function HomePage() {
       layerRefs.current.forEach((layer) => layer && clearInteraction(layer));
       setInteractionActive((current) => current.map(() => false));
 
-      videoRefs.current.forEach((video, index) => {
-        if (!video) return;
-        video.muted = index !== activeIndex;
-        if (index === activeIndex) video.play().catch(() => undefined);
-        else video.pause();
-      });
+      activateVideo(timelineIndex);
 
       const manifest = await loadEpisodeManifest(currentDrama.id, episode.episodeNumber).catch(() => null);
-      if (disposed || !manifest) return;
-      const durationMs = getVideoDurationMs(videoRefs.current[activeIndex]);
+      if (disposed || !manifest || activeIndexRef.current !== timelineIndex) return;
+      const durationMs = getVideoDurationMs(videoRefs.current[timelineIndex]);
       const manifestWithDuration = {
         ...manifest,
         duration_ms: durationMs || manifest.duration_ms,
@@ -293,37 +369,39 @@ export default function HomePage() {
       const timeline = new InteractionTimeline({
         manifest: manifestWithDuration,
         onActivate: (point: InteractionPoint) => {
-          const layer = layerRefs.current[activeIndex];
+          if (activeIndexRef.current !== timelineIndex) return;
+          const layer = layerRefs.current[timelineIndex];
           if (!layer) return;
-          setInteractionActive((current) => current.map((value, index) => (index === activeIndex ? true : value)));
+          setInteractionActive((current) => current.map((value, index) => (index === timelineIndex ? true : value)));
           renderInteraction(layer, {
             interactionPoint: point,
             assetBaseUrl: manifestWithDuration.client_hints?.asset_base_url || '/assets/',
             deviceTier: 'MEDIUM',
             statsSnapshot: null,
             onInteract: (event: { eventType: string; actionData: Record<string, unknown> }) => {
-              enqueueEvent(episode, point.id, event.eventType, event.actionData, (videoRefs.current[activeIndex]?.currentTime || 0) * 1000);
+              enqueueEvent(episode, point.id, event.eventType, event.actionData, (videoRefs.current[timelineIndex]?.currentTime || 0) * 1000);
               if (point.component !== 'emotion_buffer' || event.actionData.skip_forward_seconds !== 10) return;
-              const video = videoRefs.current[activeIndex];
+              const video = videoRefs.current[timelineIndex];
               if (!video) return;
               const nextTime = Number.isFinite(video.duration) ? Math.min(video.duration, video.currentTime + 10) : video.currentTime + 10;
-              syncTimelineDuration(video);
+              syncTimelineDuration(video, timelineIndex);
               video.currentTime = nextTime;
               timeline.seek(nextTime * 1000);
-              updateProgress(activeIndex, video);
+              updateProgress(timelineIndex, video);
             },
             onDismiss: (reason: string) => timeline.dismissActive(reason),
           });
         },
         onDismiss: () => {
-          const layer = layerRefs.current[activeIndex];
+          const layer = layerRefs.current[timelineIndex];
           if (layer) clearInteraction(layer);
-          setInteractionActive((current) => current.map((value, index) => (index === activeIndex ? false : value)));
+          setInteractionActive((current) => current.map((value, index) => (index === timelineIndex ? false : value)));
         },
         onTick: () => undefined,
       });
       timelineRef.current = timeline;
       timeline.play(true);
+      timeline.sync((videoRefs.current[timelineIndex]?.currentTime || 0) * 1000);
     }
 
     activate();
@@ -331,7 +409,7 @@ export default function HomePage() {
       disposed = true;
       timelineRef.current?.pause();
     };
-  }, [activeIndex, drama, feedEpisodes]);
+  }, [activeIndex, activateVideo, drama, feedEpisodes]);
 
   if (loading) return <LoadingState title="正在加载首页剧集" />;
   if (error) return <ErrorState title="首页不可用" message={error} onAction={reload} />;
@@ -358,18 +436,30 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth">
+      <section
+        ref={feedRef}
+        className="h-full touch-none snap-y snap-mandatory overflow-y-auto scroll-smooth"
+        onScroll={handleFeedScroll}
+        onPointerDown={handleFeedPointerDown}
+        onPointerUp={finishFeedSwipe}
+        onPointerCancel={(event) => {
+          if (swipePointerIdRef.current !== event.pointerId) return;
+          swipePointerIdRef.current = null;
+          swipeBlockedRef.current = false;
+        }}
+      >
         {feedEpisodes.map((episode, index) => (
           <article
             key={episode.id}
-            className="relative h-dvh snap-start overflow-hidden bg-black"
+            className="relative h-dvh snap-start snap-always overflow-hidden bg-black"
             onClick={(event) => {
+              if (swipeConsumedRef.current) {
+                swipeConsumedRef.current = false;
+                return;
+              }
               if (interactionActive[index]) return;
               if ((event.target as HTMLElement).closest('[data-video-control]')) return;
-              const video = videoRefs.current[index];
-              if (!video) return;
-              if (video.paused) video.play().catch(() => undefined);
-              else video.pause();
+              void togglePlaybackAt(index);
             }}
           >
             <video
@@ -379,7 +469,7 @@ export default function HomePage() {
               data-index={index}
               className="absolute inset-x-0 top-1/2 h-auto w-full -translate-y-1/2 object-contain"
               src={episode.videoUrl}
-              muted={index !== activeIndex}
+              muted={!soundUnlockedRef.current || index !== activeIndex}
               loop
               playsInline
               preload={index < 2 ? 'auto' : 'metadata'}
@@ -392,6 +482,10 @@ export default function HomePage() {
               onLoadedMetadata={(event) => {
                 syncTimelineDuration(event.currentTarget, index);
                 updateProgress(index, event.currentTarget);
+                if (index === activeIndexRef.current) activateVideo(index);
+              }}
+              onCanPlay={() => {
+                if (index === activeIndexRef.current && videoRefs.current[index]?.paused) activateVideo(index);
               }}
               onSeeking={(event) => {
                 if (draggingIndexRef.current !== index) updateProgress(index, event.currentTarget);
@@ -405,7 +499,7 @@ export default function HomePage() {
                 syncWatchProgress(episode, event.currentTarget, { force: true });
               }}
             />
-            <div ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[45] overflow-hidden" />
+            <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[200] overflow-hidden" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
 
             <button
@@ -417,7 +511,7 @@ export default function HomePage() {
               }`}
               onClick={(event) => {
                 event.stopPropagation();
-                videoRefs.current[index]?.play().catch(() => undefined);
+                void togglePlaybackAt(index);
               }}
             >
               <Play size={25} fill="currentColor" className="translate-x-0.5" />

@@ -1,8 +1,9 @@
 import { ChevronLeft, ListVideo, Pause, Play, Sparkles } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ErrorState, LoadingState } from '../components/PageState';
-import { loadDrama, loadEpisode, loadEpisodeManifest } from '../data/catalog';
+import { loadDrama, loadEpisodeManifest } from '../data/catalog';
 import type { DramaItem, Episode } from '../data/catalog';
 import { createEmptyManifest } from '../data/manifest';
 import { updateWatchProgress } from '../data/profile';
@@ -11,62 +12,75 @@ import { LocalEventQueue } from '../interaction/queue';
 import { InteractionTimeline } from '../interaction/timeline.js';
 import type { InteractionManifest, InteractionPoint, InteractionTimeline as InteractionTimelineType } from '../interaction/types';
 
-const formatTime = (ms: number) => {
-  const total = Math.floor(ms / 1000);
-  const minutes = Math.floor(total / 60).toString().padStart(2, '0');
-  const seconds = (total % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
-};
+function formatTime(value: number) {
+  if (!Number.isFinite(value) || value < 0) return '00:00';
+  const totalSeconds = Math.floor(value / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 export default function PlayerPage() {
   const [searchParams] = useSearchParams();
   const dramaId = searchParams.get('drama') || 'furao-dadi';
-  const episodeNumber = Number(searchParams.get('episode') || '1') || 1;
+  const requestedEpisodeNumber = Number(searchParams.get('episode') || '1') || 1;
   const [drama, setDrama] = useState<DramaItem | null>(null);
-  const [episode, setEpisode] = useState<Episode | null>(null);
-  const [manifest, setManifest] = useState<InteractionManifest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [manifestStatus, setManifestStatus] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [manifests, setManifests] = useState<Record<number, InteractionManifest>>({});
+  const [episodeDurations, setEpisodeDurations] = useState<Record<number, number>>({});
+  const [manifestStatus, setManifestStatus] = useState<Record<number, string>>({});
   const [queueStatus, setQueueStatus] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const layerRef = useRef<HTMLDivElement | null>(null);
+  const [progressMs, setProgressMs] = useState<number[]>([]);
+  const [paused, setPaused] = useState<boolean[]>([]);
+  const [showBranchPrompt, setShowBranchPrompt] = useState(false);
+  const videoRefs = useRef<Array<HTMLVideoElement | null>>([]);
+  const layerRefs = useRef<Array<HTMLDivElement | null>>([]);
   const timelineRef = useRef<InteractionTimelineType | null>(null);
   const queueRef = useRef<LocalEventQueue | null>(null);
-  const episodeRef = useRef<Episode | null>(null);
-  const lastProgressSyncRef = useRef(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentMs, setCurrentMs] = useState(0);
-  const [showBranchPrompt, setShowBranchPrompt] = useState(false);
+  const manifestsRef = useRef<Record<number, InteractionManifest>>({});
+  const activeIndexRef = useRef(0);
+  const episodesRef = useRef<Episode[]>([]);
+  const lastProgressSyncRef = useRef<Record<string, number>>({});
+  const soundUnlockedRef = useRef(Capacitor.isNativePlatform());
+  const initialScrollDoneRef = useRef(false);
 
-  const progress = useMemo(() => {
-    if (!manifest?.duration_ms) return 0;
-    return Math.min(100, Math.max(0, (currentMs / manifest.duration_ms) * 100));
-  }, [currentMs, manifest?.duration_ms]);
+  const episodes = useMemo(() => drama?.episodes || [], [drama]);
+
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  useEffect(() => {
+    episodesRef.current = episodes;
+  }, [episodes]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setManifestStatus(null);
+    setManifestStatus({});
+    setShowBranchPrompt(false);
+    initialScrollDoneRef.current = false;
     try {
-      const [loadedDrama, loadedEpisode] = await Promise.all([
-        loadDrama(dramaId).catch(() => null),
-        loadEpisode(dramaId, episodeNumber),
-      ]);
+      const loadedDrama = await loadDrama(dramaId);
+      if (!loadedDrama.episodes.length) throw new Error('后端暂无可播放剧集');
+      const initialIndex = Math.max(0, loadedDrama.episodes.findIndex((item) => item.episodeNumber === requestedEpisodeNumber));
       setDrama(loadedDrama);
-      setEpisode(loadedEpisode);
-
-      const remoteManifest = await loadEpisodeManifest(dramaId, episodeNumber).catch((err) => {
-        setManifestStatus(err instanceof Error ? err.message : '互动配置加载失败');
-        return null;
-      });
-      setManifest(remoteManifest || createEmptyManifest(dramaId, loadedEpisode));
+      setActiveIndex(initialIndex);
+      setProgressMs(loadedDrama.episodes.map(() => 0));
+      setPaused(loadedDrama.episodes.map(() => true));
+      manifestsRef.current = {};
+      setManifests({});
+      setEpisodeDurations({});
     } catch (err) {
-      setError(err instanceof Error ? err.message : '剧集加载失败');
+      setError(err instanceof Error ? err.message : '播放器加载失败');
     } finally {
       setLoading(false);
     }
-  }, [dramaId, episodeNumber]);
+  }, [dramaId, requestedEpisodeNumber]);
 
   useEffect(() => {
     queueRef.current = new LocalEventQueue(setQueueStatus);
@@ -74,39 +88,51 @@ export default function PlayerPage() {
   }, [reload]);
 
   useEffect(() => {
-    episodeRef.current = episode;
-  }, [episode]);
+    if (!episodes.length || initialScrollDoneRef.current) return;
+    const node = videoRefs.current[activeIndex];
+    if (!node) return;
+    initialScrollDoneRef.current = true;
+    node.closest('article')?.scrollIntoView({ block: 'start' });
+  }, [activeIndex, episodes.length]);
 
-  const getVideoDurationMs = (video: HTMLVideoElement | null) => {
-    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return manifest?.duration_ms || 0;
-    return Math.round(video.duration * 1000);
+  const getManifest = (episode: Episode) => manifests[episode.episodeNumber] || createEmptyManifest(dramaId, episode);
+
+  const getVideoDurationMs = (video: HTMLVideoElement | null, episode?: Episode) => {
+    if (video && Number.isFinite(video.duration) && video.duration > 0) return Math.round(video.duration * 1000);
+    if (episode) return manifests[episode.episodeNumber]?.duration_ms || episodeDurations[episode.episodeNumber] || 0;
+    return 0;
   };
 
   const syncWatchProgress = useCallback(
-    (options: { force?: boolean; keepalive?: boolean; progressMs?: number; durationMs?: number } = {}) => {
-      const currentEpisode = episodeRef.current;
-      const video = videoRef.current;
-      if (!currentEpisode || !video) return;
+    (episode: Episode | null | undefined, video: HTMLVideoElement | null, options: { force?: boolean; keepalive?: boolean } = {}) => {
+      if (!episode || !video) return;
       const currentTime = Number.isFinite(video.currentTime) && video.currentTime > 0 ? video.currentTime : 0;
-      const durationMs = options.durationMs ?? getVideoDurationMs(video);
-      const progressMs = options.progressMs ?? Math.max(0, Math.round(currentTime * 1000));
-      if (!durationMs && !progressMs) return;
+      const durationMs = video && Number.isFinite(video.duration) && video.duration > 0
+        ? Math.round(video.duration * 1000)
+        : manifestsRef.current[episode.episodeNumber]?.duration_ms || 0;
+      const nextProgressMs = Math.max(0, Math.round(currentTime * 1000));
+      if (!durationMs && !nextProgressMs) return;
 
       const now = Date.now();
-      if (!options.force && now - lastProgressSyncRef.current < 5000) return;
-      lastProgressSyncRef.current = now;
+      const previous = lastProgressSyncRef.current[episode.id] || 0;
+      if (!options.force && now - previous < 5000) return;
+      lastProgressSyncRef.current[episode.id] = now;
 
-      updateWatchProgress(currentEpisode.id, progressMs, durationMs || progressMs, { keepalive: options.keepalive }).catch((err) => {
+      updateWatchProgress(episode.id, nextProgressMs, durationMs || nextProgressMs, { keepalive: options.keepalive }).catch((err) => {
         if (!options.keepalive) setQueueStatus(err instanceof Error ? err.message : '观看进度同步失败');
       });
     },
-    [manifest?.duration_ms],
+    [],
   );
 
   useEffect(() => {
+    const syncCurrentProgress = (keepalive = false) => {
+      const index = activeIndexRef.current;
+      syncWatchProgress(episodesRef.current[index], videoRefs.current[index], { force: true, keepalive });
+    };
     const flush = () => {
       queueRef.current?.flush().catch((err) => setQueueStatus(err instanceof Error ? err.message : '互动事件上报失败'));
-      syncWatchProgress({ force: true, keepalive: true });
+      syncCurrentProgress(true);
     };
     const interval = window.setInterval(flush, 10000);
     const onVisibilityChange = () => {
@@ -115,210 +141,345 @@ export default function PlayerPage() {
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      syncWatchProgress({ force: true, keepalive: true });
+      flush();
       window.clearInterval(interval);
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [syncWatchProgress]);
 
-  useEffect(() => {
-    if (!manifest || !episode) return undefined;
-    timelineRef.current?.pause();
-    if (layerRef.current) clearInteraction(layerRef.current);
-    videoRef.current?.pause();
-    if (videoRef.current) videoRef.current.currentTime = 0;
-    setIsPlaying(false);
-    setCurrentMs(0);
+  const playVideo = async (video: HTMLVideoElement | null, options: { withSound?: boolean } = {}) => {
+    if (!video) return false;
+    video.playsInline = true;
+    video.muted = !options.withSound;
+    try {
+      await video.play();
+      return true;
+    } catch {
+      if (!options.withSound) return false;
+      video.muted = true;
+      try {
+        await video.play();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
 
-    const timeline = new InteractionTimeline({
-      manifest,
-      onActivate: (point: InteractionPoint) => {
-        const layer = layerRef.current;
-        if (!layer) return;
-        renderInteraction(layer, {
-          interactionPoint: point,
-          assetBaseUrl: manifest.client_hints?.asset_base_url || '/assets/',
-          deviceTier: 'MEDIUM',
-          statsSnapshot: null,
-          onInteract: (event: { eventType: string; actionData: Record<string, unknown> }) => {
-            queueRef.current?.enqueue({
-              dramaId,
-              episodeNumber,
-              pointId: point.id,
-              type: event.eventType,
-              actionData: event.actionData,
-              atMs: (videoRef.current?.currentTime || timeline.currentMs / 1000) * 1000,
-            });
-            queueRef.current?.flush().catch((err) => setQueueStatus(err instanceof Error ? err.message : '互动事件上报失败'));
-            if (point.component !== 'emotion_buffer' || event.actionData.skip_forward_seconds !== 10) return;
-            const video = videoRef.current;
-            if (!video) return;
-            const nextTime = Number.isFinite(video.duration) ? Math.min(video.duration, video.currentTime + 10) : video.currentTime + 10;
-            video.currentTime = nextTime;
-            timeline.seek(nextTime * 1000);
-            setCurrentMs(nextTime * 1000);
-          },
-          onDismiss: (reason: string) => timeline.dismissActive(reason),
-        });
-      },
-      onDismiss: () => {
-        if (layerRef.current) clearInteraction(layerRef.current);
-      },
-      onTick: setCurrentMs,
+  const activateVideo = useCallback((index: number) => {
+    videoRefs.current.forEach((video, itemIndex) => {
+      if (!video) return;
+      if (itemIndex !== index) {
+        video.pause();
+        video.muted = true;
+        return;
+      }
+      void playVideo(video, { withSound: soundUnlockedRef.current });
     });
+  }, []);
 
-    timelineRef.current = timeline;
+  const handleFeedScroll = useCallback((event: React.UIEvent<HTMLElement>) => {
+    const feed = event.currentTarget;
+    if (feed.clientHeight <= 0 || !episodes.length) return;
+    const nextIndex = Math.max(0, Math.min(episodes.length - 1, Math.round(feed.scrollTop / feed.clientHeight)));
+    if (nextIndex === activeIndexRef.current) return;
+    activeIndexRef.current = nextIndex;
+    activateVideo(nextIndex);
+    setActiveIndex(nextIndex);
+  }, [activateVideo, episodes.length]);
 
-    return () => {
-      timeline.pause();
-      if (layerRef.current) clearInteraction(layerRef.current);
-      syncWatchProgress({ force: true });
-    };
-  }, [dramaId, episode, episodeNumber, manifest, syncWatchProgress]);
+  useEffect(() => {
+    if (!episodes.length) return;
+    activateVideo(activeIndex);
+  }, [activeIndex, activateVideo, episodes.length]);
 
-  const togglePlayback = async () => {
-    const video = videoRef.current;
-    const timeline = timelineRef.current;
-    if (!timeline) return;
-
-    if (timeline.running) {
-      syncWatchProgress({ force: true });
-      timeline.pause();
-      video?.pause();
-      setIsPlaying(false);
+  const togglePlaybackAt = async (index: number) => {
+    const video = videoRefs.current[index];
+    if (!video) return;
+    soundUnlockedRef.current = true;
+    video.muted = false;
+    if (video.paused) {
+      const played = await playVideo(video, { withSound: true });
+      if (played) setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? false : value)));
       return;
     }
-
-    timeline.play(Boolean(video));
-    await video?.play().catch(() => undefined);
-    setIsPlaying(true);
+    video.pause();
   };
 
-  const seekTo = (ms: number) => {
-    const video = videoRef.current;
-    const timeline = timelineRef.current;
-    if (!timeline) return;
-    const nextMs = Math.min(ms, manifest?.duration_ms || ms);
-    if (video) {
-      video.currentTime = nextMs / 1000;
-      timeline.seek(nextMs);
-    } else {
-      timeline.seek(nextMs);
+  const updateManifestDuration = (episode: Episode, durationMs: number) => {
+    if (!durationMs) return;
+    setEpisodeDurations((current) => (
+      current[episode.episodeNumber] === durationMs
+        ? current
+        : { ...current, [episode.episodeNumber]: durationMs }
+    ));
+    setManifests((current) => {
+      const existing = current[episode.episodeNumber];
+      if (!existing) return current;
+      if (existing.duration_ms === durationMs) return current;
+      const next = {
+        ...current,
+        [episode.episodeNumber]: { ...existing, duration_ms: durationMs },
+      };
+      manifestsRef.current = next;
+      return next;
+    });
+    if (timelineRef.current && episodesRef.current[activeIndexRef.current]?.id === episode.id) {
+      timelineRef.current.manifest.duration_ms = durationMs;
     }
-    setCurrentMs(nextMs);
-    syncWatchProgress({ force: true, progressMs: nextMs, durationMs: manifest?.duration_ms || nextMs });
   };
+
+  const enqueueEvent = (episode: Episode, pointId: string, type: string, actionData: Record<string, unknown>, atMs = 0) => {
+    queueRef.current?.enqueue({
+      dramaId,
+      episodeNumber: episode.episodeNumber,
+      pointId,
+      type,
+      actionData,
+      atMs,
+    });
+    queueRef.current?.flush().catch((err) => setQueueStatus(err instanceof Error ? err.message : '互动事件上报失败'));
+  };
+
+  useEffect(() => {
+    if (!episodes.length) return undefined;
+    const timelineIndex = activeIndex;
+    const episode = episodes[timelineIndex];
+    if (!episode) return undefined;
+    let disposed = false;
+
+    async function activate() {
+      setShowBranchPrompt(false);
+      timelineRef.current?.pause();
+      layerRefs.current.forEach((layer) => layer && clearInteraction(layer));
+      activateVideo(timelineIndex);
+
+      let manifest: InteractionManifest | null | undefined = manifestsRef.current[episode.episodeNumber];
+      if (!manifest) {
+        manifest = await loadEpisodeManifest(dramaId, episode.episodeNumber).catch((err) => {
+          setManifestStatus((current) => ({
+            ...current,
+            [episode.episodeNumber]: err instanceof Error ? err.message : '互动配置加载失败',
+          }));
+          return null;
+        });
+        if (disposed || !manifest || activeIndexRef.current !== timelineIndex) return;
+        const loadedManifest = manifest;
+        setManifests((current) => {
+          const next = { ...current, [episode.episodeNumber]: loadedManifest };
+          manifestsRef.current = next;
+          return next;
+        });
+      }
+      if (!manifest || disposed || activeIndexRef.current !== timelineIndex) return;
+
+      const video = videoRefs.current[timelineIndex];
+      const durationMs = getVideoDurationMs(video, episode);
+      const timelineManifest = {
+        ...manifest,
+        duration_ms: durationMs || manifest.duration_ms,
+      } as InteractionManifest;
+
+      const timeline = new InteractionTimeline({
+        manifest: timelineManifest,
+        onActivate: (point: InteractionPoint) => {
+          if (activeIndexRef.current !== timelineIndex) return;
+          const layer = layerRefs.current[timelineIndex];
+          if (!layer) return;
+          layer.style.zIndex = '200';
+          renderInteraction(layer, {
+            interactionPoint: point,
+            assetBaseUrl: timelineManifest.client_hints?.asset_base_url || '/assets/',
+            deviceTier: 'MEDIUM',
+            statsSnapshot: null,
+            onInteract: (event: { eventType: string; actionData: Record<string, unknown> }) => {
+              enqueueEvent(episode, point.id, event.eventType, event.actionData, (videoRefs.current[timelineIndex]?.currentTime || 0) * 1000);
+              if (point.component !== 'emotion_buffer' || event.actionData.skip_forward_seconds !== 10) return;
+              const currentVideo = videoRefs.current[timelineIndex];
+              if (!currentVideo) return;
+              const nextTime = Number.isFinite(currentVideo.duration)
+                ? Math.min(currentVideo.duration, currentVideo.currentTime + 10)
+                : currentVideo.currentTime + 10;
+              currentVideo.currentTime = nextTime;
+              timeline.seek(nextTime * 1000);
+              setProgressMs((current) => current.map((value, index) => (index === timelineIndex ? nextTime * 1000 : value)));
+            },
+            onDismiss: (reason: string) => timeline.dismissActive(reason),
+          });
+        },
+        onDismiss: () => {
+          const layer = layerRefs.current[timelineIndex];
+          if (layer) {
+            clearInteraction(layer);
+            layer.style.zIndex = '200';
+          }
+        },
+        onTick: () => undefined,
+      });
+      timelineRef.current = timeline;
+      timeline.play(true);
+      timeline.sync((videoRefs.current[timelineIndex]?.currentTime || 0) * 1000);
+    }
+
+    void activate();
+    return () => {
+      disposed = true;
+      syncWatchProgress(episode, videoRefs.current[timelineIndex], { force: true });
+      timelineRef.current?.pause();
+      const layer = layerRefs.current[timelineIndex];
+      if (layer) {
+        clearInteraction(layer);
+        layer.style.zIndex = '200';
+      }
+    };
+  }, [activeIndex, activateVideo, dramaId, episodes, syncWatchProgress]);
 
   if (loading) return <LoadingState title="正在加载播放器" />;
-  if (error || !episode || !manifest) return <ErrorState title="播放器不可用" message={error || '剧集数据不完整'} onAction={reload} />;
+  if (error || !drama || !episodes.length) return <ErrorState title="播放器不可用" message={error || '剧集数据不完整'} onAction={reload} />;
 
   return (
-    <main className="phone-safe relative flex min-h-dvh flex-col bg-black">
-      <header className="absolute left-0 right-0 top-0 z-40 flex h-14 items-center justify-between px-margin-page text-white">
-        <Link className="icon-button bg-black/20 backdrop-blur" to="/home" aria-label="返回首页">
+    <main className="phone-safe relative h-dvh overflow-hidden bg-black">
+      <header className="pointer-events-none absolute left-0 right-0 top-0 z-40 flex h-14 items-center justify-between px-margin-page text-white">
+        <Link className="pointer-events-auto icon-button bg-black/20 backdrop-blur" to="/home" aria-label="返回首页">
           <ChevronLeft size={28} />
         </Link>
-        <div className="max-w-60 truncate rounded-full bg-black/25 px-3 py-1 text-label-md backdrop-blur">{manifest.title || episode.title}</div>
-        <Link className="icon-button bg-black/20 backdrop-blur" to={`/detail?drama=${dramaId}`} aria-label="选集">
+        <div className="max-w-60 truncate rounded-full bg-black/25 px-3 py-1 text-label-md backdrop-blur">
+          第 {episodes[activeIndex]?.episodeNumber || requestedEpisodeNumber} 集
+        </div>
+        <Link className="pointer-events-auto icon-button bg-black/20 backdrop-blur" to={`/detail?drama=${dramaId}`} aria-label="选集">
           <ListVideo size={21} />
         </Link>
       </header>
 
-      <section className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
-        <video
-          ref={videoRef}
-          className="h-auto w-full object-contain"
-          src={manifest.video_url || episode.videoUrl}
-          playsInline
-          preload="metadata"
-          onLoadedMetadata={(event) => {
-            const duration = event.currentTarget.duration;
-            if (Number.isFinite(duration) && duration > 0) {
-              setManifest((current) => current ? { ...current, duration_ms: Math.round(duration * 1000) } : current);
-            }
-          }}
-          onTimeUpdate={(event) => {
-            const nextMs = event.currentTarget.currentTime * 1000;
-            timelineRef.current?.sync(nextMs);
-            setCurrentMs(nextMs);
-            syncWatchProgress();
-          }}
-          onEnded={() => {
-            syncWatchProgress({ force: true });
-            timelineRef.current?.pause();
-            setIsPlaying(false);
-            if (episode.isLastEpisode && drama?.hasBranchNarrative) {
-              setShowBranchPrompt(true);
-            }
-          }}
-          onPause={() => syncWatchProgress({ force: true })}
-        />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/80 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent" />
-        <div ref={layerRef} className="absolute inset-0 z-30 overflow-hidden touch-none" />
+      <section className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth" onScroll={handleFeedScroll}>
+        {episodes.map((episode, index) => {
+          const manifest = getManifest(episode);
+          const durationMs = getVideoDurationMs(videoRefs.current[index], episode);
+          const currentProgressMs = progressMs[index] || 0;
+          const progress = durationMs ? Math.min(100, Math.max(0, (currentProgressMs / durationMs) * 100)) : 0;
+          return (
+            <article
+              key={episode.id}
+              className="relative h-dvh snap-start overflow-hidden bg-black"
+              onClick={(event) => {
+                if ((event.target as HTMLElement).closest('[data-video-control]')) return;
+                void togglePlaybackAt(index);
+              }}
+            >
+              <video
+                ref={(node) => {
+                  videoRefs.current[index] = node;
+                }}
+                data-index={index}
+                className="absolute inset-x-0 top-1/2 h-auto w-full -translate-y-1/2 object-contain"
+                src={manifest.video_url || episode.videoUrl}
+                muted={!soundUnlockedRef.current || index !== activeIndex}
+                playsInline
+                preload={Math.abs(index - activeIndex) <= 1 ? 'auto' : 'metadata'}
+                onLoadedMetadata={(event) => {
+                  updateManifestDuration(episode, getVideoDurationMs(event.currentTarget, episode));
+                  if (index === activeIndexRef.current) activateVideo(index);
+                }}
+                onCanPlay={() => {
+                  if (index === activeIndexRef.current && videoRefs.current[index]?.paused) activateVideo(index);
+                }}
+                onTimeUpdate={(event) => {
+                  const nextMs = event.currentTarget.currentTime * 1000;
+                  setProgressMs((current) => current.map((value, itemIndex) => (itemIndex === index ? nextMs : value)));
+                  syncWatchProgress(episode, event.currentTarget);
+                  if (index === activeIndex) timelineRef.current?.sync(nextMs);
+                }}
+                onPlay={() => setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? false : value)))}
+                onPause={(event) => {
+                  setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? true : value)));
+                  syncWatchProgress(episode, event.currentTarget, { force: true });
+                }}
+                onEnded={(event) => {
+                  syncWatchProgress(episode, event.currentTarget, { force: true });
+                  timelineRef.current?.pause();
+                  setPaused((current) => current.map((value, itemIndex) => (itemIndex === index ? true : value)));
+                  if (episode.isLastEpisode && drama.hasBranchNarrative) setShowBranchPrompt(true);
+                  else event.currentTarget.closest('article')?.nextElementSibling?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+              />
+
+              <div data-video-control ref={(node) => { layerRefs.current[index] = node; }} className="pointer-events-none absolute inset-0 z-[200] overflow-hidden" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/80 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black via-black/55 to-transparent" />
+
+              <button
+                data-video-control
+                className={`absolute left-1/2 top-1/2 z-40 grid h-[54px] w-[54px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-neutral-900/55 text-white/90 transition-opacity duration-200 ${
+                  paused[index] ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+                type="button"
+                aria-label={paused[index] ? '播放' : '暂停'}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void togglePlaybackAt(index);
+                }}
+              >
+                {paused[index] ? <Play size={26} fill="currentColor" className="translate-x-0.5" /> : <Pause size={25} fill="currentColor" />}
+              </button>
+
+              <section className="pointer-events-none absolute bottom-20 left-0 right-0 z-40 px-margin-page text-white">
+                <p className="mb-1 text-label-md text-primary">{drama.title} · 第 {episode.episodeNumber} 集</p>
+                <h1 className="mb-2 line-clamp-2 text-display-lg-mobile font-bold">{episode.title}</h1>
+                <p className="line-clamp-2 text-body-sm text-white/75">{drama.description}</p>
+                {manifestStatus[episode.episodeNumber] ? (
+                  <p className="mt-2 text-label-md text-white/65">暂无互动配置，视频可继续播放</p>
+                ) : null}
+                {queueStatus && index === activeIndex ? <p className="mt-2 text-label-md text-white/65">{queueStatus}</p> : null}
+              </section>
+
+              <div data-video-control className="absolute inset-x-0 bottom-14 z-50 px-margin-page">
+                <div className="mb-2 flex items-center justify-between text-label-md text-white/70">
+                  <span>{formatTime(currentProgressMs)}</span>
+                  <span>{formatTime(durationMs)}</span>
+                </div>
+                <input
+                  className="h-1 w-full cursor-pointer appearance-none rounded-full border-0 bg-white/20 p-0 accent-primary"
+                  type="range"
+                  min={0}
+                  max={durationMs || 1}
+                  value={Math.min(Math.round(currentProgressMs), durationMs || 1)}
+                  step={100}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => {
+                    const video = videoRefs.current[index];
+                    const nextMs = Number(event.currentTarget.value);
+                    if (video) video.currentTime = nextMs / 1000;
+                    if (index === activeIndex) timelineRef.current?.seek(nextMs);
+                    setProgressMs((current) => current.map((value, itemIndex) => (itemIndex === index ? nextMs : value)));
+                    syncWatchProgress(episode, videoRefs.current[index], { force: true });
+                  }}
+                  style={{
+                    background: `linear-gradient(90deg, #d0bcff ${progress}%, rgba(255,255,255,.2) ${progress}%)`,
+                  }}
+                />
+              </div>
+            </article>
+          );
+        })}
       </section>
 
-      <section className="absolute bottom-0 left-0 right-0 z-40 px-margin-page pb-8 pt-20 text-white">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="truncate text-label-md text-white/70">{episode.title}</p>
-            <h1 className="truncate text-display-lg-mobile font-bold">{drama?.title || dramaId}</h1>
-            {manifestStatus ? <p className="mt-1 text-label-md text-white/65">暂无互动配置：{manifestStatus}</p> : null}
-            {queueStatus ? <p className="mt-1 text-label-md text-white/65">{queueStatus}</p> : null}
-          </div>
-          <button
-            className="primary-gradient grid h-14 w-14 shrink-0 place-items-center rounded-full text-white shadow-xl transition active:scale-95"
-            type="button"
-            onClick={togglePlayback}
-            aria-label={isPlaying ? '暂停' : '播放'}
-          >
-            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="w-11 text-label-md text-white/70">{formatTime(currentMs)}</span>
-          <input
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-full border-0 bg-white/20 p-0 accent-primary"
-            type="range"
-            min={0}
-            max={manifest.duration_ms || 1}
-            value={Math.round(currentMs)}
-            step={100}
-            onChange={(event) => seekTo(Number(event.currentTarget.value))}
-            style={{
-              background: `linear-gradient(90deg, #d0bcff ${progress}%, rgba(255,255,255,.2) ${progress}%)`,
-            }}
-          />
-          <span className="w-11 text-right text-label-md text-white/70">{formatTime(manifest.duration_ms)}</span>
-        </div>
-      </section>
-
-      {/* Branch narrative prompt overlay */}
       {showBranchPrompt ? (
         <section className="absolute inset-0 z-50 flex items-end justify-center bg-gradient-to-t from-black/95 via-black/70 to-transparent px-margin-page pb-12">
-          <div className="w-full max-w-sm animate-[fadeInUp_0.5s_ease-out] rounded-2xl border border-primary/30 bg-black/80 p-6 text-center backdrop-blur-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-primary/30 bg-black/80 p-6 text-center backdrop-blur-2xl">
             <Sparkles size={36} className="mx-auto mb-3 text-primary" />
             <h2 className="mb-2 text-headline-md font-bold text-white">剧集已完结</h2>
-            <p className="mb-2 text-body-sm text-white/60">
-              AI 已为你生成三条不同的续写支线，选择你的命运走向，继续探索这个故事的更多可能。
-            </p>
-            <div className="mb-4 flex flex-wrap justify-center gap-1.5">
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-label-xs text-primary">多结局</span>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-label-xs text-primary">互动叙事</span>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-label-xs text-primary">AI 续写</span>
-            </div>
+            <p className="mb-4 text-body-sm text-white/60">AI 已为你生成不同的续写支线，可以继续探索故事的更多可能。</p>
             <div className="flex gap-3">
               <button
-                className="flex-1 rounded-xl border border-white/15 bg-white/5 py-3 text-body-md text-white/70 backdrop-blur transition active:scale-95"
+                className="flex-1 rounded-xl border border-white/15 bg-white/5 py-3 text-body-md text-white/70"
                 type="button"
                 onClick={() => setShowBranchPrompt(false)}
               >
                 稍后再说
               </button>
               <Link
-                className="primary-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-body-md font-semibold text-white transition active:scale-95"
+                className="primary-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-body-md font-semibold text-white"
                 to={`/branch?drama=${dramaId}`}
               >
                 <Sparkles size={18} />
