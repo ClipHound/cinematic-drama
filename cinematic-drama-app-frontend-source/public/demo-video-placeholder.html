@@ -13,8 +13,10 @@
       h1 { margin: 0 0 8px; font-size: clamp(24px, 5vw, 38px); }
       p { margin: 0 0 20px; color: #c9bfd7; line-height: 1.7; }
       video { display: block; width: 100%; max-height: 76vh; background: #000; border: 1px solid rgba(255,255,255,.14); border-radius: 18px; box-shadow: 0 24px 80px rgba(0,0,0,.48); }
-      a { display: inline-block; margin-top: 18px; color: #e8d7ff; text-decoration: none; }
+      .links { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 18px; }
+      a { display: inline-block; padding: 10px 16px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; color: #e8d7ff; text-decoration: none; }
       a:hover { text-decoration: underline; }
+      .repository { margin: 18px 0 0; font-size: 14px; color: #a99db9; overflow-wrap: anywhere; }
     </style>
   </head>
   <body>
@@ -25,7 +27,11 @@
         <source src="/assets/promo/cinematic-drama-promo.mp4" type="video/mp4" />
         您的浏览器暂不支持 HTML5 视频播放。
       </video>
-      <a href="/assets/promo/cinematic-drama-promo.mp4" download>下载宣传片</a>
+      <div class="links">
+        <a href="https://github.com/ClipHound/cinematic-drama" target="_blank" rel="noopener noreferrer">查看 GitHub 项目</a>
+        <a href="/assets/promo/cinematic-drama-promo.mp4" download>下载宣传片</a>
+      </div>
+      <p class="repository">GitHub：github.com/ClipHound/cinematic-drama</p>
     </main>
   </body>
 </html>
